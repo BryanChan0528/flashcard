@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NLP Flashcards</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #f5f5f5;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 30px;
+        }
+        .flashcard-container {
+            perspective: 1000px;
+            width: 80%;
+            max-width: 600px;
+            margin-bottom: 20px;
+        }
+        .flashcard {
+            position: relative;
+            width: 100%;
+            height: 300px;
+            transform-style: preserve-3d;
+            transition: transform 0.6s;
+            cursor: pointer;
+        }
+        .flashcard.flipped {
+            transform: rotateY(180deg);
+        }
+        .flashcard-front, .flashcard-back {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden;
+            border-radius: 10px;
+            padding: 20px;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+        .flashcard-front {
+            background-color: #3498db;
+            color: white;
+            text-align: center;
+        }
+        .flashcard-back {
+            background-color: #2ecc71;
+            color: white;
+            transform: rotateY(180deg);
+        }
+        .question, .answer {
+            font-size: 1.2em;
+            margin-bottom: 20px;
+        }
+        .controls {
+            display: flex;
+            justify-content: space-between;
+            width: 80%;
+            max-width: 600px;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #2c3e50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1em;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #1a252f;
+        }
+        button:disabled {
+            background-color: #95a5a6;
+            cursor: not-allowed;
+        }
+        .counter {
+            margin-top: 20px;
+            color: #2c3e50;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <h1>NLP Flashcards</h1>
+    <div class="flashcard-container">
+        <div class="flashcard" id="flashcard" onclick="flipCard()">
+            <div class="flashcard-front">
+                <div class="question" id="question">Click to start</div>
+            </div>
+            <div class="flashcard-back">
+                <div class="answer" id="answer">Answer will appear here</div>
+            </div>
+        </div>
+    </div>
+    <div class="controls">
+        <button id="prevBtn" onclick="prevCard()" disabled>Previous</button>
+        <button id="nextBtn" onclick="nextCard()">Next</button>
+    </div>
+    <div class="counter" id="counter">0 / 0</div>
+
+    <script>
+        const flashcards = [
+            {
+                "Question": "What is tokenization in NLP?", 
+                "Answer": "Breaking text into meaningful elements (tokens), such as words or sentences."
+            },
+            {
+                "Question": "Name two common tokenization issues and a solution.", 
+                "Answer": "Issues: Abbreviations ('Dr.'), ellipses; Solution: Use pre-trained models like PunktSentenceTokenizer."
+            },
+            {
+                "Question": "Why is lowercasing important?", 
+                "Answer": "Standardizes text, reduces vocabulary size, and improves consistency across tokens."
+            },
+            {
+                "Question": "List three types of noise removed during preprocessing.", 
+                "Answer": "Punctuation, HTML tags, special characters and numbers."
+            },
+            {
+                "Question": "What are stopwords and why remove them?", 
+                "Answer": "Common words (e.g., 'the','is') with low semantic value; removal reduces dimensionality and focuses on informative terms."
+            },
+            {
+                "Question": "Difference between stemming and lemmatization?", 
+                "Answer": "Stemming truncates words to stems (may not be real words); lemmatization uses vocabulary and POS tags to return valid base forms."
+            },
+            {
+                "Question": "What is text normalization?", 
+                "Answer": "Converting non-standard tokens (slang, abbreviations) into standard forms using dictionaries or statistical methods."
+            },
+            {
+                "Question": "Define Bag of Words (BoW).", 
+                "Answer": "Represents documents as vectors of raw word counts over a fixed vocabulary."
+            },
+            {
+                "Question": "How does TF-IDF improve on BoW?", 
+                "Answer": "Weights terms by inverse document frequency, down-weighting common words and highlighting rare, informative terms."
+            },
+            {
+                "Question": "Name two prediction-based word embeddings.", 
+                "Answer": "Word2Vec and GloVe (also FastText)."
+            },
+            {
+                "Question": "What are the two architectures of Word2Vec?", 
+                "Answer": "Skip-Gram (predict context from target) and CBOW (predict target from context)."
+            },
+            {
+                "Question": "How does FastText handle out-of-vocabulary words?", 
+                "Answer": "Represents words as sums of character n-gram embeddings, enabling subword modeling."
+            },
+            {
+                "Question": "What is a contextualized embedding?", 
+                "Answer": "An embedding that changes based on the word's surrounding context (e.g., ELMo, BERT)."
+            },
+            {
+                "Question": "What are the two pre-training tasks in BERT?", 
+                "Answer": "Masked Language Model (MLM) and Next Sentence Prediction (NSP)."
+            },
+            {
+                "Question": "Define POS tagging.", 
+                "Answer": "Assigning each word its part-of-speech category (e.g., noun, verb) based on context."
+            },
+            {
+                "Question": "Difference between open and closed class words?", 
+                "Answer": "Open classes (nouns, verbs, adjectives, adverbs) regularly gain new words; closed classes (pronouns, prepositions, determiners) are stable."
+            },
+            {
+                "Question": "Name two POS tagging algorithms.", 
+                "Answer": "Hidden Markov Models (HMM) and Conditional Random Fields (CRF)."
+            },
+            {
+                "Question": "List three stages of a typical NLP pipeline.", 
+                "Answer": "Text preprocessing, feature engineering (vectorization), modeling and evaluation."
+            }
+        ];
+
+        let currentCardIndex = 0;
+        let isFlipped = false;
+        const flashcard = document.getElementById('flashcard');
+        const questionElement = document.getElementById('question');
+        const answerElement = document.getElementById('answer');
+        const prevBtn = document.getElementById('prevBtn');
+        const nextBtn = document.getElementById('nextBtn');
+        const counterElement = document.getElementById('counter');
+
+        function updateCard() {
+            if (currentCardIndex >= 0 && currentCardIndex < flashcards.length) {
+                questionElement.textContent = flashcards[currentCardIndex].Question;
+                answerElement.textContent = flashcards[currentCardIndex].Answer;
+                counterElement.textContent = `${currentCardIndex + 1} / ${flashcards.length}`;
+                
+                prevBtn.disabled = currentCardIndex === 0;
+                nextBtn.disabled = currentCardIndex === flashcards.length - 1;
+                
+                if (isFlipped) {
+                    flashcard.classList.add('flipped');
+                } else {
+                    flashcard.classList.remove('flipped');
+                }
+            }
+        }
+
+        function flipCard() {
+            isFlipped = !isFlipped;
+            flashcard.classList.toggle('flipped');
+        }
+
+        function nextCard() {
+            if (currentCardIndex < flashcards.length - 1) {
+                currentCardIndex++;
+                isFlipped = false;
+                updateCard();
+            }
+        }
+
+        function prevCard() {
+            if (currentCardIndex > 0) {
+                currentCardIndex--;
+                isFlipped = false;
+                updateCard();
+            }
+        }
+
+        // Initialize the first card
+        updateCard();
+
+        // Add keyboard navigation
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'ArrowRight') {
+                nextCard();
+            } else if (event.key === 'ArrowLeft') {
+                prevCard();
+            } else if (event.key === ' ' || event.key === 'Enter') {
+                flipCard();
+            }
+        });
+    </script>
+</body>
+</html>
