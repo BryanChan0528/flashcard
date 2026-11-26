@@ -14,163 +14,243 @@
 
     SETUP: set API_URL below to your Apps Script web app URL (ends in /exec).
   -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
   <style>
+    /* Design tokens copied from the pyrahash.com landing page (index.css). */
     :root {
-      --accent: #00e5ff;
-      --on-accent: #111111;
-      --bg: #f2f4f7;
-      --surface: #ffffff;
-      --text: #1b1f24;
-      --muted: #4a5360;
-      --border: #d9dee5;
-      --focus: #0b57d0;
-      --wallet-bg: #1f1f1f;
-      --wallet-text: #ffffff;
-      --skeleton: #e6e9ee;
-      color-scheme: light dark;
-    }
-    @media (prefers-color-scheme: dark) {
-      :root {
-        --bg: #07090f;
-        --surface: #12161d;
-        --text: #eef1f4;
-        --muted: #b4bcc6;
-        --border: #2a313b;
-        --focus: #a8c7fa;
-        --wallet-bg: #ffffff;
-        --wallet-text: #1f1f1f;
-        --skeleton: #222831;
-      }
+      color-scheme: only light;
+      --ph-bg-base:        #07090F;
+      --ph-bg-surface:     #0D1120;
+      --ph-bg-glass:       rgba(255, 255, 255, 0.04);
+      --ph-accent-primary: #00E5FF;
+      --ph-accent-violet:  #7C3AED;
+      --ph-accent-indigo:  #4F46E5;
+      --ph-text-primary:   #F0F4FF;
+      --ph-text-secondary: #8892AA;
+      --ph-border-subtle:  rgba(255, 255, 255, 0.07);
+      --ph-border-accent:  rgba(0, 229, 255, 0.25);
+      --ph-glow-cyan:      0 0 24px rgba(0, 229, 255, 0.35);
+      --ph-glow-violet:    0 0 24px rgba(124, 58, 237, 0.35);
+      /* CARD_COLOR from the sheet can override the accent. */
+      --accent: var(--ph-accent-primary);
+      --on-accent: #07090F;
+      --gradient: linear-gradient(90deg, #00E5FF, #7C3AED);
     }
     *, *::before, *::after { box-sizing: border-box; }
     html, body { margin: 0; }
+    html { -webkit-tap-highlight-color: transparent; }
     body {
-      background: var(--bg);
-      color: var(--text);
-      font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 16px;
+      line-height: 1.5;
+      color: var(--ph-text-primary);
+      background-color: var(--ph-bg-base);
+      /* Dot grid plus soft cyan and violet glows, like the landing page. */
+      background-image:
+        radial-gradient(600px circle at 10% -10%, rgba(0, 229, 255, 0.14), transparent 60%),
+        radial-gradient(600px circle at 110% 110%, rgba(124, 58, 237, 0.18), transparent 60%),
+        radial-gradient(circle, rgba(255, 255, 255, 0.07) 1px, transparent 1px);
+      background-size: 100% 100%, 100% 100%, 24px 24px;
+      background-attachment: fixed;
       min-height: 100vh;
-      padding: 16px 16px calc(24px + env(safe-area-inset-bottom));
+      padding: 24px 16px calc(32px + env(safe-area-inset-bottom));
       display: flex;
-      justify-content: center;
-      align-items: flex-start;
+      flex-direction: column;
+      align-items: center;
+      overflow-x: hidden;
     }
+    h1, h2 { font-family: 'Space Grotesk', 'Inter', sans-serif; }
     [hidden] { display: none !important; }
+
+    /* Card: the landing page's glass-card with a gradient top edge. */
     .card {
+      position: relative;
       width: 100%;
-      max-width: 440px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 20px;
+      max-width: 420px;
+      background: var(--ph-bg-glass);
+      border: 1px solid var(--ph-border-subtle);
+      border-radius: 16px;
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
       overflow: hidden;
-      box-shadow: 0 8px 28px rgba(0, 0, 0, .08);
+    }
+    .card::before {
+      content: '';
+      position: absolute; inset: 0 0 auto 0;
+      height: 2px;
+      background: var(--gradient);
     }
     .brand {
-      background: var(--accent);
-      color: var(--on-accent);
       display: flex;
       align-items: center;
-      gap: 12px;
-      padding: 18px 20px 56px;
+      gap: 10px;
+      padding: 20px 20px 0;
     }
-    .brand img { height: 36px; width: auto; max-width: 140px; object-fit: contain; }
-    .brand span { font-weight: 600; font-size: 1.05rem; letter-spacing: .01em; }
-    .profile { padding: 0 20px 8px; text-align: center; }
+    .brand img { height: 28px; width: auto; max-width: 140px; object-fit: contain; }
+    .brand span {
+      font-family: 'Space Grotesk', 'Inter', sans-serif;
+      font-weight: 600;
+      font-size: 1.05rem;
+      letter-spacing: .01em;
+    }
+
+    /* Profile */
+    .profile { padding: 28px 20px 4px; text-align: center; }
     .avatar {
-      width: 104px; height: 104px;
-      margin: -52px auto 12px;
+      width: 112px; height: 112px;
+      margin: 0 auto 18px;
+      padding: 3px;
       border-radius: 50%;
-      border: 4px solid var(--surface);
-      background: var(--accent);
-      color: var(--on-accent);
-      display: flex; align-items: center; justify-content: center;
-      font-size: 2rem; font-weight: 600;
+      background: var(--gradient);
+      box-shadow: var(--ph-glow-cyan);
+    }
+    .avatar-inner {
+      width: 100%; height: 100%;
+      border-radius: 50%;
       overflow: hidden;
+      background: var(--ph-bg-surface);
+      display: flex; align-items: center; justify-content: center;
+      font-family: 'Space Grotesk', 'Inter', sans-serif;
+      font-size: 2.1rem; font-weight: 600;
+      color: var(--ph-text-primary);
     }
     .avatar img { width: 100%; height: 100%; object-fit: cover; }
-    h1 { font-size: 1.5rem; line-height: 1.25; margin: 0 0 4px; overflow-wrap: anywhere; }
-    .title { margin: 0; font-weight: 500; overflow-wrap: anywhere; }
-    .dept { margin: 2px 0 0; color: var(--muted); overflow-wrap: anywhere; }
-    .contacts { list-style: none; margin: 20px 0 0; padding: 0 20px; }
-    .contacts li + li { border-top: 1px solid var(--border); }
+    h1 { font-size: 1.65rem; font-weight: 700; line-height: 1.2; margin: 0 0 6px; overflow-wrap: anywhere; }
+    .title {
+      margin: 0;
+      font-weight: 600;
+      overflow-wrap: anywhere;
+      background: var(--gradient);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .dept { margin: 4px 0 0; color: var(--ph-text-secondary); font-size: .95rem; overflow-wrap: anywhere; }
+
+    /* Contact rows */
+    .contacts { list-style: none; margin: 22px 0 0; padding: 0 16px; display: grid; gap: 8px; }
     .contacts a {
       display: flex; align-items: center; gap: 14px;
-      min-height: 52px; padding: 8px 4px;
-      color: var(--text); text-decoration: none;
-      border-radius: 8px;
+      min-height: 56px; padding: 10px 12px;
+      color: var(--ph-text-primary); text-decoration: none;
+      background: rgba(255, 255, 255, 0.025);
+      border: 1px solid var(--ph-border-subtle);
+      border-radius: 12px;
+      transition: border-color .2s ease, box-shadow .2s ease;
     }
-    .contacts a:hover .value { text-decoration: underline; }
+    .contacts a:hover { border-color: var(--ph-border-accent); box-shadow: var(--ph-glow-cyan); }
     .icon {
-      flex: none; width: 36px; height: 36px; border-radius: 50%;
+      flex: none; width: 38px; height: 38px; border-radius: 10px;
       display: flex; align-items: center; justify-content: center;
-      background: var(--accent); color: var(--on-accent);
+      background: rgba(0, 229, 255, 0.08);
+      border: 1px solid var(--ph-border-accent);
+      color: var(--accent);
     }
     .icon svg { width: 18px; height: 18px; }
-    .label { display: block; font-size: .8rem; color: var(--muted); }
+    .label { display: block; font-size: .75rem; letter-spacing: .04em; text-transform: uppercase; color: var(--ph-text-secondary); }
     .value { display: block; overflow-wrap: anywhere; }
-    .actions { display: grid; gap: 10px; padding: 20px; }
+
+    /* Buttons: btn-glow and btn-ghost from the landing page. */
+    .actions { display: grid; gap: 10px; padding: 22px 16px 16px; }
     .btn {
-      display: flex; align-items: center; justify-content: center; gap: 8px;
+      display: flex; align-items: center; justify-content: center; gap: .5rem;
       min-height: 48px; padding: 12px 16px;
-      border-radius: 999px; border: 1px solid transparent;
+      border-radius: 8px; border: 1px solid transparent;
       font: inherit; font-weight: 600; text-decoration: none; text-align: center;
       cursor: pointer;
+      transition: box-shadow .2s ease, transform .15s ease, background .2s ease;
     }
-    .btn-primary { background: var(--accent); color: var(--on-accent); }
-    .btn-wallet { background: var(--wallet-bg); color: var(--wallet-text); }
-    .btn-secondary { background: transparent; color: var(--text); border-color: var(--border); }
-    .btn:hover { filter: brightness(1.06); }
+    .btn svg { width: 20px; height: 20px; }
+    .btn-primary { background: var(--accent); color: var(--on-accent); box-shadow: var(--ph-glow-cyan); }
+    .btn-primary:hover { box-shadow: 0 0 40px rgba(0, 229, 255, 0.6); transform: translateY(-1px); }
+    .btn-secondary { background: transparent; border-color: var(--ph-border-accent); color: var(--accent); }
+    .btn-secondary:hover { background: rgba(0, 229, 255, 0.06); transform: translateY(-1px); }
+    .btn-wallet { background: #000000; color: #ffffff; border-color: rgba(255, 255, 255, 0.18); }
+    .btn-wallet:hover { transform: translateY(-1px); border-color: rgba(255, 255, 255, 0.35); }
+    .btn-link {
+      justify-self: center;
+      min-height: 44px; padding: 10px 4px;
+      background: none; color: var(--ph-text-secondary);
+      font-weight: 500;
+      position: relative;
+    }
+    .btn-link:hover { color: var(--ph-text-primary); }
+    .btn-link::after {
+      content: ''; position: absolute; left: 4px; right: 4px; bottom: 8px; height: 2px;
+      background: var(--accent); border-radius: 1px;
+      transform: scaleX(0); transform-origin: left center; transition: transform .25s ease;
+    }
+    .btn-link:hover::after { transform: scaleX(1); }
+
+    /* Focus ring, same as the landing page. */
     a:focus-visible, button:focus-visible {
-      outline: 3px solid var(--focus);
+      outline: 2px solid var(--ph-accent-primary);
       outline-offset: 3px;
     }
-    .status { min-height: 1.5em; margin: 0; padding: 0 20px 4px; font-size: .9rem; color: var(--muted); text-align: center; }
-    .status a { color: inherit; }
-    .message { padding: 8px 24px 28px; text-align: center; }
+
+    .status { min-height: 1.5em; margin: 0; padding: 0 20px 18px; font-size: .875rem; color: var(--ph-text-secondary); text-align: center; }
+    .status a { color: var(--accent); }
+
+    .message { padding: 32px 24px 28px; text-align: center; }
     .message h1 { margin-top: 4px; }
-    .message p { color: var(--muted); }
-    .message .actions { padding: 8px 0 0; }
-    .skeleton { padding: 0 20px 28px; text-align: center; }
-    .skeleton .avatar { background: var(--skeleton); }
-    .bar { height: 14px; border-radius: 7px; background: var(--skeleton); margin: 10px auto; }
-    .btn-qr svg { width: 20px; height: 20px; }
-    /* QR dialog: always black on white so every phone camera can read it. */
+    .message p { color: var(--ph-text-secondary); }
+    .message .actions { padding: 12px 0 0; }
+
+    .skeleton { padding: 28px 20px 36px; text-align: center; }
+    .skeleton .avatar { background: rgba(255, 255, 255, 0.06); box-shadow: none; }
+    .bar { height: 14px; border-radius: 7px; background: rgba(255, 255, 255, 0.06); margin: 12px auto; }
+
+    /* QR dialog: the code itself stays black on white so every camera reads it. */
     dialog.qr {
       width: min(92vw, 380px);
       max-height: 92vh;
-      padding: 20px;
-      border: 0;
-      border-radius: 20px;
-      background: var(--surface);
-      color: var(--text);
+      padding: 22px 20px 20px;
+      border: 1px solid var(--ph-border-accent);
+      border-radius: 16px;
+      background: var(--ph-bg-surface);
+      color: var(--ph-text-primary);
+      box-shadow: var(--ph-glow-cyan), 0 24px 60px rgba(0, 0, 0, 0.6);
       text-align: center;
     }
-    dialog.qr::backdrop { background: rgba(0, 0, 0, .7); }
-    dialog.qr h2 { font-size: 1.15rem; margin: 0 0 4px; }
-    dialog.qr p { margin: 0; color: var(--muted); font-size: .9rem; }
+    dialog.qr::backdrop { background: rgba(7, 9, 15, 0.8); backdrop-filter: blur(4px); }
+    dialog.qr h2 { font-size: 1.2rem; margin: 0 0 4px; }
+    dialog.qr p { margin: 0; color: var(--ph-text-secondary); font-size: .9rem; }
     .qr-box {
-      margin: 16px auto;
+      margin: 18px auto;
       padding: 14px;
       background: #ffffff;
       border-radius: 12px;
       width: fit-content;
+      box-shadow: var(--ph-glow-cyan);
     }
     .qr-box canvas { display: block; width: 260px; height: 260px; max-width: 70vw; max-height: 70vw; }
     .segmented {
       display: inline-grid; grid-template-columns: 1fr 1fr; gap: 4px;
-      padding: 4px; border-radius: 999px; border: 1px solid var(--border);
-      margin-bottom: 12px;
+      padding: 4px; border-radius: 10px;
+      border: 1px solid var(--ph-border-subtle);
+      background: var(--ph-bg-glass);
+      margin-bottom: 14px;
     }
     .segmented button {
       font: inherit; font-weight: 600; font-size: .9rem;
-      padding: 8px 14px; border-radius: 999px; border: 0; cursor: pointer;
-      background: transparent; color: var(--text);
+      padding: 8px 16px; border-radius: 7px; border: 0; cursor: pointer;
+      background: transparent; color: var(--ph-text-secondary);
     }
     .segmented button[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); }
-    .qr-close { margin-top: 16px; width: 100%; }
+    .qr-close { width: 100%; }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { transition: none !important; animation: none !important; }
+      .btn:hover { transform: none; }
+    }
     @media (prefers-reduced-motion: no-preference) {
-      .btn { transition: filter .15s ease; }
       .skeleton .avatar, .bar { animation: pulse 1.2s ease-in-out infinite; }
       @keyframes pulse { 50% { opacity: .5; } }
+      .card { animation: rise .5s ease-out both; }
+      @keyframes rise { from { opacity: 0; transform: translateY(16px); } }
     }
   </style>
 </head>
@@ -183,7 +263,7 @@
 
     <!-- Loading state -->
     <div class="skeleton" id="loading" role="status" aria-label="Loading name card">
-      <div class="avatar"></div>
+      <div class="avatar"><div class="avatar-inner"></div></div>
       <div class="bar" style="width: 60%;"></div>
       <div class="bar" style="width: 40%;"></div>
     </div>
@@ -191,10 +271,10 @@
     <!-- Card -->
     <div id="profile-view" hidden>
       <section class="profile" aria-labelledby="name">
-        <div class="avatar">
+        <div class="avatar"><div class="avatar-inner">
           <img id="photo" alt="" hidden>
           <span id="initials" aria-hidden="true"></span>
-        </div>
+        </div></div>
         <h1 id="name"></h1>
         <p class="title" id="title" hidden></p>
         <p class="dept" id="dept" hidden></p>
@@ -234,7 +314,7 @@
           Show QR code
         </button>
         <a class="btn btn-wallet" id="wallet" rel="noopener" aria-label="Add this card to Google Wallet" hidden>Add to Wallet</a>
-        <a class="btn btn-secondary company-link" rel="noopener">Visit PyraHash</a>
+        <a class="btn btn-link company-link" rel="noopener">Visit PyraHash</a>
       </div>
       <p class="status" id="status" role="status" aria-live="polite">
         <span id="fallback" hidden>Download didn't start? <a id="fallback-link">Get the contact file</a>.</span>
