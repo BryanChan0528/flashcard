@@ -5,9 +5,12 @@
   <meta charset="utf-8">
   <!--
     Card page template, rendered by renderCardPage_() in Code.gs.
-    Every sheet value is printed with <?= ?>, which HtmlService escapes for
-    its context. The only unescaped prints (<?!= ?>) are the two colours,
-    which Code.gs has already checked against /^#[0-9a-f]{6}$/.
+    Every sheet value is printed with an escaping (printing) scriptlet, which
+    HtmlService escapes for its context. The only force-printed (unescaped)
+    values are the two colours, which Code.gs has already checked against
+    /^#[0-9a-f]{6}$/.
+    Note: never write scriptlet tags inside comments. Apps Script runs them
+    even there.
   -->
   <style>
     :root {
