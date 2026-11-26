@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="robots" content="noindex">
+  <meta name="theme-color" content="#07090F">
   <title>PyraHash name card</title>
   <!--
     PyraHash digital name card, hosted on pyrahash.com.
@@ -11,6 +12,10 @@
     that path to this file), fetches the card data from the Apps Script
     JSON endpoint, and renders it. All values are inserted with textContent
     or checked URL attributes, never as HTML.
+
+    Design: 3D flip card (front: who, back: contact details and QR), an
+    animated cyan-to-violet edge, and a staggered entrance. Motion is turned
+    off for visitors who have "reduce motion" switched on.
 
     SETUP: set API_URL below to your Apps Script web app URL (ends in /exec).
   -->
@@ -32,12 +37,22 @@
       --ph-border-subtle:  rgba(255, 255, 255, 0.07);
       --ph-border-accent:  rgba(0, 229, 255, 0.25);
       --ph-glow-cyan:      0 0 24px rgba(0, 229, 255, 0.35);
-      --ph-glow-violet:    0 0 24px rgba(124, 58, 237, 0.35);
       /* CARD_COLOR from the sheet can override the accent. */
       --accent: var(--ph-accent-primary);
       --on-accent: #07090F;
       --gradient: linear-gradient(90deg, #00E5FF, #7C3AED);
+      --ease-out: cubic-bezier(.2, .7, .2, 1);
+      --radius: 20px;
     }
+
+    /* Animatable angle for the travelling edge glow. Browsers without
+       @property support show a still gradient edge instead. */
+    @property --angle {
+      syntax: '<angle>';
+      initial-value: 0deg;
+      inherits: false;
+    }
+
     *, *::before, *::after { box-sizing: border-box; }
     html, body { margin: 0; }
     html { -webkit-tap-highlight-color: transparent; }
@@ -47,7 +62,6 @@
       line-height: 1.5;
       color: var(--ph-text-primary);
       background-color: var(--ph-bg-base);
-      /* Dot grid plus soft cyan and violet glows, like the landing page. */
       background-image:
         radial-gradient(600px circle at 10% -10%, rgba(0, 229, 255, 0.14), transparent 60%),
         radial-gradient(600px circle at 110% 110%, rgba(124, 58, 237, 0.18), transparent 60%),
@@ -55,53 +69,91 @@
       background-size: 100% 100%, 100% 100%, 24px 24px;
       background-attachment: fixed;
       min-height: 100vh;
-      padding: 24px 16px calc(32px + env(safe-area-inset-bottom));
+      padding: 28px 18px calc(32px + env(safe-area-inset-bottom));
       display: flex;
-      flex-direction: column;
-      align-items: center;
+      justify-content: center;
       overflow-x: hidden;
     }
     h1, h2 { font-family: 'Space Grotesk', 'Inter', sans-serif; }
     [hidden] { display: none !important; }
+    .stage { width: 100%; max-width: 400px; }
 
-    /* Card: the landing page's glass-card with a gradient top edge. */
-    .card {
+    /* ---- Card faces with the animated gradient edge -------------------- */
+    .face {
       position: relative;
-      width: 100%;
-      max-width: 420px;
-      background: var(--ph-bg-glass);
-      border: 1px solid var(--ph-border-subtle);
-      border-radius: 16px;
-      backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
-      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+      border-radius: var(--radius);
+      border: 1.5px solid transparent;
+      background:
+        radial-gradient(circle, rgba(255, 255, 255, 0.045) 1px, transparent 1px) padding-box 0 0 / 18px 18px,
+        radial-gradient(420px circle at 0% 0%, rgba(0, 229, 255, 0.12), transparent 60%) padding-box,
+        radial-gradient(420px circle at 100% 100%, rgba(124, 58, 237, 0.16), transparent 60%) padding-box,
+        linear-gradient(160deg, #10162A, #0A0D18) padding-box,
+        conic-gradient(from var(--angle),
+          rgba(0, 229, 255, 0.12), #00E5FF 12%, #7C3AED 26%, rgba(124, 58, 237, 0.12) 40%,
+          rgba(0, 229, 255, 0.12) 60%, #00E5FF 74%, #7C3AED 88%, rgba(0, 229, 255, 0.12)) border-box;
+      box-shadow: 0 30px 60px rgba(0, 0, 0, 0.5);
+      animation: spin 7s linear infinite;
       overflow: hidden;
     }
-    .card::before {
-      content: '';
-      position: absolute; inset: 0 0 auto 0;
-      height: 2px;
-      background: var(--gradient);
-    }
-    .brand {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 20px 20px 0;
-    }
-    .brand img { display: block; height: 32px; width: auto; max-width: 180px; object-fit: contain; }
-    .brand span {
-      font-family: 'Space Grotesk', 'Inter', sans-serif;
-      font-weight: 600;
-      font-size: 1.05rem;
-      letter-spacing: .01em;
+    @keyframes spin { to { --angle: 360deg; } }
+
+    /* Soft glow behind the card that follows the travelling edge. */
+    .glow {
+      position: absolute;
+      inset: 10px;
+      border-radius: var(--radius);
+      background: conic-gradient(from var(--angle), #00E5FF, #7C3AED, #00E5FF, #7C3AED, #00E5FF);
+      filter: blur(28px);
+      opacity: .35;
+      animation: spin 7s linear infinite;
+      pointer-events: none;
     }
 
-    /* Profile */
-    .profile { padding: 28px 20px 4px; text-align: center; }
+    /* ---- 3D flip --------------------------------------------------------- */
+    .flip-wrap { position: relative; perspective: 1400px; }
+    .flipper {
+      position: relative;
+      display: grid;
+      transform-style: preserve-3d;
+      transition: transform .85s var(--ease-out);
+      cursor: pointer;
+    }
+    .flipper > .face {
+      grid-area: 1 / 1;
+      backface-visibility: hidden;
+      -webkit-backface-visibility: hidden;
+    }
+    .flipper .back { transform: rotateY(180deg); }
+    .flipper.is-flipped { transform: rotateY(180deg); }
+    .flipper.peek { animation: peek 1s var(--ease-out); }
+    @keyframes peek {
+      40% { transform: rotateY(-16deg); }
+      100% { transform: rotateY(0deg); }
+    }
+
+    .face-inner { position: relative; padding: 22px 20px 20px; height: 100%; display: flex; flex-direction: column; }
+    .brand { display: flex; align-items: center; gap: 10px; min-height: 32px; }
+    .brand img { display: block; height: 32px; width: auto; max-width: 180px; object-fit: contain; }
+    .brand span { font-family: 'Space Grotesk', 'Inter', sans-serif; font-weight: 600; font-size: 1.05rem; }
+    .flip-btn {
+      position: absolute; top: 16px; right: 16px;
+      width: 40px; height: 40px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      background: rgba(0, 229, 255, 0.08);
+      border: 1px solid var(--ph-border-accent);
+      color: var(--accent);
+      cursor: pointer;
+      transition: box-shadow .2s ease, transform .2s ease;
+    }
+    .flip-btn:hover { box-shadow: var(--ph-glow-cyan); transform: rotate(-20deg); }
+    .flip-btn svg { width: 20px; height: 20px; }
+
+    /* Front */
+    .front .face-inner { justify-content: space-between; text-align: center; min-height: 440px; }
+    .who { padding-top: 18px; }
     .avatar {
-      width: 112px; height: 112px;
-      margin: 0 auto 18px;
+      width: 120px; height: 120px;
+      margin: 0 auto 20px;
       padding: 3px;
       border-radius: 50%;
       background: var(--gradient);
@@ -114,51 +166,65 @@
       background: var(--ph-bg-surface);
       display: flex; align-items: center; justify-content: center;
       font-family: 'Space Grotesk', 'Inter', sans-serif;
-      font-size: 2.1rem; font-weight: 600;
-      color: var(--ph-text-primary);
+      font-size: 2.2rem; font-weight: 600;
     }
     .avatar img { width: 100%; height: 100%; object-fit: cover; }
-    h1 { font-size: 1.65rem; font-weight: 700; line-height: 1.2; margin: 0 0 6px; overflow-wrap: anywhere; }
+    h1 { font-size: 1.75rem; font-weight: 700; line-height: 1.2; margin: 0 0 6px; overflow-wrap: anywhere; }
     .title {
-      margin: 0;
-      font-weight: 600;
-      overflow-wrap: anywhere;
+      margin: 0; font-weight: 600; overflow-wrap: anywhere;
       background: var(--gradient);
-      -webkit-background-clip: text;
+      -webkit-background-clip: text; background-clip: text;
       -webkit-text-fill-color: transparent;
-      background-clip: text;
     }
     .dept { margin: 4px 0 0; color: var(--ph-text-secondary); font-size: .95rem; overflow-wrap: anywhere; }
+    .flip-hint {
+      margin: 20px 0 0;
+      display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+      font-size: .8rem; letter-spacing: .06em; text-transform: uppercase;
+      color: var(--ph-text-secondary);
+    }
+    .flip-hint svg { width: 14px; height: 14px; }
 
-    /* Contact rows */
-    .contacts { list-style: none; margin: 22px 0 0; padding: 0 16px; display: grid; gap: 8px; }
+    /* Back */
+    .back .face-inner { gap: 16px; }
+    .back-title { margin: 6px 0 0; font-size: .8rem; letter-spacing: .06em; text-transform: uppercase; color: var(--ph-text-secondary); }
+    .contacts { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
     .contacts a {
-      display: flex; align-items: center; gap: 14px;
-      min-height: 56px; padding: 10px 12px;
+      display: flex; align-items: center; gap: 12px;
+      min-height: 52px; padding: 8px 12px;
       color: var(--ph-text-primary); text-decoration: none;
-      background: rgba(255, 255, 255, 0.025);
+      background: rgba(255, 255, 255, 0.03);
       border: 1px solid var(--ph-border-subtle);
       border-radius: 12px;
       transition: border-color .2s ease, box-shadow .2s ease;
     }
     .contacts a:hover { border-color: var(--ph-border-accent); box-shadow: var(--ph-glow-cyan); }
     .icon {
-      flex: none; width: 38px; height: 38px; border-radius: 10px;
+      flex: none; width: 36px; height: 36px; border-radius: 10px;
       display: flex; align-items: center; justify-content: center;
       background: rgba(0, 229, 255, 0.08);
       border: 1px solid var(--ph-border-accent);
       color: var(--accent);
     }
     .icon svg { width: 18px; height: 18px; }
-    .label { display: block; font-size: .75rem; letter-spacing: .04em; text-transform: uppercase; color: var(--ph-text-secondary); }
-    .value { display: block; overflow-wrap: anywhere; }
+    .label { display: block; font-size: .7rem; letter-spacing: .05em; text-transform: uppercase; color: var(--ph-text-secondary); }
+    .value { display: block; overflow-wrap: anywhere; font-size: .95rem; }
+    .qr-mini-wrap { margin-top: auto; display: flex; align-items: center; gap: 14px; }
+    .qr-mini {
+      flex: none; padding: 8px; border: 0; border-radius: 10px;
+      background: #ffffff; cursor: zoom-in;
+      box-shadow: var(--ph-glow-cyan);
+    }
+    .qr-mini canvas { display: block; width: 104px; height: 104px; }
+    .qr-mini-text { margin: 0; font-size: .9rem; color: var(--ph-text-secondary); text-align: left; }
+    .qr-mini-text strong { display: block; color: var(--ph-text-primary); font-weight: 600; }
 
-    /* Buttons: btn-glow and btn-ghost from the landing page. */
-    .actions { display: grid; gap: 10px; padding: 22px 16px 16px; }
+    /* ---- Buttons below the card (btn-glow / btn-ghost) ------------------ */
+    .actions { display: grid; gap: 10px; margin-top: 26px; }
     .btn {
       display: flex; align-items: center; justify-content: center; gap: .5rem;
-      min-height: 48px; padding: 12px 16px;
-      border-radius: 8px; border: 1px solid transparent;
+      min-height: 50px; padding: 12px 16px;
+      border-radius: 10px; border: 1px solid transparent;
       font: inherit; font-weight: 600; text-decoration: none; text-align: center;
       cursor: pointer;
       transition: box-shadow .2s ease, transform .15s ease, background .2s ease;
@@ -170,12 +236,11 @@
     .btn-secondary:hover { background: rgba(0, 229, 255, 0.06); transform: translateY(-1px); }
     .btn-wallet { background: #000000; color: #ffffff; border-color: rgba(255, 255, 255, 0.18); }
     .btn-wallet:hover { transform: translateY(-1px); border-color: rgba(255, 255, 255, 0.35); }
+    .btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     .btn-link {
-      justify-self: center;
+      justify-self: center; position: relative;
       min-height: 44px; padding: 10px 4px;
-      background: none; color: var(--ph-text-secondary);
-      font-weight: 500;
-      position: relative;
+      background: none; color: var(--ph-text-secondary); font-weight: 500;
     }
     .btn-link:hover { color: var(--ph-text-primary); }
     .btn-link::after {
@@ -185,31 +250,42 @@
     }
     .btn-link:hover::after { transform: scaleX(1); }
 
-    /* Focus ring, same as the landing page. */
     a:focus-visible, button:focus-visible {
       outline: 2px solid var(--ph-accent-primary);
       outline-offset: 3px;
     }
 
-    .status { min-height: 1.5em; margin: 0; padding: 0 20px 18px; font-size: .875rem; color: var(--ph-text-secondary); text-align: center; }
+    .status { min-height: 1.5em; margin: 6px 0 0; font-size: .875rem; color: var(--ph-text-secondary); text-align: center; }
     .status a { color: var(--accent); }
 
-    .message { padding: 32px 24px 28px; text-align: center; }
-    .message h1 { margin-top: 4px; }
-    .message p { color: var(--ph-text-secondary); }
-    .message .actions { padding: 12px 0 0; }
+    /* ---- Loading and message states ------------------------------------- */
+    .skeleton .face-inner { min-height: 440px; align-items: center; justify-content: center; gap: 12px; }
+    .skeleton .avatar { background: rgba(255, 255, 255, 0.06); box-shadow: none; margin-bottom: 8px; }
+    .bar { height: 14px; border-radius: 7px; background: rgba(255, 255, 255, 0.06); }
+    .message .face-inner { text-align: center; gap: 8px; padding: 26px 22px 24px; }
+    .message .brand { justify-content: center; margin-bottom: 10px; }
+    .message p { color: var(--ph-text-secondary); margin: 0 0 8px; }
+    .message .actions { margin-top: 10px; }
 
-    .skeleton { padding: 28px 20px 36px; text-align: center; }
-    .skeleton .avatar { background: rgba(255, 255, 255, 0.06); box-shadow: none; }
-    .bar { height: 14px; border-radius: 7px; background: rgba(255, 255, 255, 0.06); margin: 12px auto; }
+    /* ---- Entrance: staggered fade-up, like animate-on-scroll ----------- */
+    .reveal { opacity: 0; transform: translateY(18px); }
+    .is-ready .reveal {
+      animation: rise .7s var(--ease-out) forwards;
+      animation-delay: calc(var(--i, 0) * 90ms);
+    }
+    .is-ready .flip-wrap.reveal { animation-name: rise-card; animation-duration: .9s; }
+    @keyframes rise { to { opacity: 1; transform: none; } }
+    @keyframes rise-card {
+      from { opacity: 0; transform: translateY(30px) scale(.96) rotateX(8deg); }
+      to { opacity: 1; transform: none; }
+    }
 
-    /* QR dialog: the code itself stays black on white so every camera reads it. */
+    /* ---- QR dialog (code stays black on white for every camera) ------- */
     dialog.qr {
-      width: min(92vw, 380px);
-      max-height: 92vh;
+      width: min(92vw, 380px); max-height: 92vh;
       padding: 22px 20px 20px;
       border: 1px solid var(--ph-border-accent);
-      border-radius: 16px;
+      border-radius: 18px;
       background: var(--ph-bg-surface);
       color: var(--ph-text-primary);
       box-shadow: var(--ph-glow-cyan), 0 24px 60px rgba(0, 0, 0, 0.6);
@@ -218,20 +294,12 @@
     dialog.qr::backdrop { background: rgba(7, 9, 15, 0.8); backdrop-filter: blur(4px); }
     dialog.qr h2 { font-size: 1.2rem; margin: 0 0 4px; }
     dialog.qr p { margin: 0; color: var(--ph-text-secondary); font-size: .9rem; }
-    .qr-box {
-      margin: 18px auto;
-      padding: 14px;
-      background: #ffffff;
-      border-radius: 12px;
-      width: fit-content;
-      box-shadow: var(--ph-glow-cyan);
-    }
+    .qr-box { margin: 18px auto; padding: 14px; background: #ffffff; border-radius: 12px; width: fit-content; box-shadow: var(--ph-glow-cyan); }
     .qr-box canvas { display: block; width: 260px; height: 260px; max-width: 70vw; max-height: 70vw; }
     .segmented {
       display: inline-grid; grid-template-columns: 1fr 1fr; gap: 4px;
       padding: 4px; border-radius: 10px;
-      border: 1px solid var(--ph-border-subtle);
-      background: var(--ph-bg-glass);
+      border: 1px solid var(--ph-border-subtle); background: var(--ph-bg-glass);
       margin-bottom: 14px;
     }
     .segmented button {
@@ -242,79 +310,135 @@
     .segmented button[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); }
     .qr-close { width: 100%; }
 
+    /* ---- Reduced motion: no spinning, flipping or sliding --------------- */
     @media (prefers-reduced-motion: reduce) {
-      *, *::before, *::after { transition: none !important; animation: none !important; }
-      .btn:hover { transform: none; }
+      .face, .glow { animation: none; }
+      .flipper, .flipper.is-flipped, .flipper .back { transform: none; transition: none; }
+      .flipper.peek { animation: none; }
+      .flipper .back { visibility: hidden; }
+      .flipper.is-flipped .back { visibility: visible; }
+      .flipper.is-flipped .front { visibility: hidden; }
+      .reveal, .is-ready .reveal { opacity: 1; transform: none; animation: none; }
+      .btn, .flip-btn, .contacts a { transition: none; }
+      .btn:hover, .flip-btn:hover { transform: none; }
     }
     @media (prefers-reduced-motion: no-preference) {
       .skeleton .avatar, .bar { animation: pulse 1.2s ease-in-out infinite; }
       @keyframes pulse { 50% { opacity: .5; } }
-      .card { animation: rise .5s ease-out both; }
-      @keyframes rise { from { opacity: 0; transform: translateY(16px); } }
     }
   </style>
 </head>
 <body>
-  <main class="card" aria-busy="true" id="card">
-    <header class="brand">
-      <img id="logo" alt="" hidden>
-      <span id="company">PyraHash</span>
-    </header>
+  <main class="stage" id="stage" aria-busy="true">
 
-    <!-- Loading state -->
-    <div class="skeleton" id="loading" role="status" aria-label="Loading name card">
-      <div class="avatar"><div class="avatar-inner"></div></div>
-      <div class="bar" style="width: 60%;"></div>
-      <div class="bar" style="width: 40%;"></div>
+    <!-- Loading -->
+    <div class="face skeleton" id="loading" role="status" aria-label="Loading name card">
+      <div class="face-inner">
+        <div class="avatar"><div class="avatar-inner"></div></div>
+        <div class="bar" style="width: 60%;"></div>
+        <div class="bar" style="width: 40%;"></div>
+      </div>
     </div>
 
     <!-- Card -->
     <div id="profile-view" hidden>
-      <section class="profile" aria-labelledby="name">
-        <div class="avatar"><div class="avatar-inner">
-          <img id="photo" alt="" hidden>
-          <span id="initials" aria-hidden="true"></span>
-        </div></div>
-        <h1 id="name"></h1>
-        <p class="title" id="title" hidden></p>
-        <p class="dept" id="dept" hidden></p>
-      </section>
+      <div class="flip-wrap reveal" style="--i: 0;">
+        <div class="glow" aria-hidden="true"></div>
+        <div class="flipper" id="flipper">
 
-      <ul class="contacts" id="contacts" aria-label="Contact details" hidden>
-        <li id="phone-row" hidden>
-          <a id="phone-link">
-            <span class="icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.25 11.4 11.4 0 0 0 3.6.57 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.45.57 3.57a1 1 0 0 1-.25 1z"/></svg>
-            </span>
-            <span><span class="label">Phone</span><span class="value" id="phone"></span></span>
-          </a>
-        </li>
-        <li id="email-row" hidden>
-          <a id="email-link">
-            <span class="icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2zm0 4-8 5-8-5V6l8 5 8-5z"/></svg>
-            </span>
-            <span><span class="label">Email</span><span class="value" id="email"></span></span>
-          </a>
-        </li>
-        <li id="web-row" hidden>
-          <a id="web-link" rel="noopener">
-            <span class="icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm6.9 6h-3a15.6 15.6 0 0 0-1.4-3.6A8 8 0 0 1 18.9 8zM12 4a14 14 0 0 1 1.9 4h-3.8A14 14 0 0 1 12 4zM4.3 14a8.2 8.2 0 0 1 0-4h3.4a16.5 16.5 0 0 0 0 4zm.8 2h3a15.6 15.6 0 0 0 1.4 3.6A8 8 0 0 1 5.1 16zm3-8h-3a8 8 0 0 1 4.4-3.6A15.6 15.6 0 0 0 8.1 8zM12 20a14 14 0 0 1-1.9-4h3.8A14 14 0 0 1 12 20zm2.3-6H9.7a14.7 14.7 0 0 1 0-4h4.6a14.7 14.7 0 0 1 0 4zm.3 5.6a15.6 15.6 0 0 0 1.4-3.6h3a8 8 0 0 1-4.4 3.6zm1.7-5.6a16.5 16.5 0 0 0 0-4h3.4a8.2 8.2 0 0 1 0 4z"/></svg>
-            </span>
-            <span><span class="label">Website</span><span class="value" id="website"></span></span>
-          </a>
-        </li>
-      </ul>
+          <!-- FRONT: who -->
+          <section class="face front" id="front" aria-labelledby="name">
+            <div class="face-inner">
+              <div class="brand reveal" style="--i: 2;">
+                <img class="js-logo" alt="" hidden>
+                <span class="js-company">PyraHash</span>
+              </div>
+              <button type="button" class="flip-btn" id="flip-to-back" aria-label="Show contact details">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 0 1 15.5-6.3L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15.5 6.3L3 16"/><path d="M3 21v-5h5"/></svg>
+              </button>
+              <div class="who">
+                <div class="avatar reveal" style="--i: 3;"><div class="avatar-inner">
+                  <img id="photo" alt="" hidden>
+                  <span id="initials" aria-hidden="true"></span>
+                </div></div>
+                <h1 id="name" class="reveal" style="--i: 4;"></h1>
+                <p class="title reveal" id="title" style="--i: 5;" hidden></p>
+                <p class="dept reveal" id="dept" style="--i: 6;" hidden></p>
+              </div>
+              <p class="flip-hint reveal" style="--i: 7;" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 15.5-6.3L21 8"/><path d="M21 3v5h-5"/></svg>
+                Tap card for contact details
+              </p>
+            </div>
+          </section>
+
+          <!-- BACK: contact details and QR -->
+          <section class="face back" id="back" aria-label="Contact details" aria-hidden="true" inert>
+            <div class="face-inner">
+              <div class="brand">
+                <img class="js-logo" alt="" hidden>
+                <span class="js-company">PyraHash</span>
+              </div>
+              <button type="button" class="flip-btn" id="flip-to-front" aria-label="Show front of card">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 0 1 15.5-6.3L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15.5 6.3L3 16"/><path d="M3 21v-5h5"/></svg>
+              </button>
+              <p class="back-title" id="back-name"></p>
+
+              <ul class="contacts" id="contacts" aria-label="Contact details" hidden>
+                <li id="phone-row" hidden>
+                  <a id="phone-link">
+                    <span class="icon" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.25 11.4 11.4 0 0 0 3.6.57 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.45.57 3.57a1 1 0 0 1-.25 1z"/></svg>
+                    </span>
+                    <span><span class="label">Phone</span><span class="value" id="phone"></span></span>
+                  </a>
+                </li>
+                <li id="email-row" hidden>
+                  <a id="email-link">
+                    <span class="icon" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2zm0 4-8 5-8-5V6l8 5 8-5z"/></svg>
+                    </span>
+                    <span><span class="label">Email</span><span class="value" id="email"></span></span>
+                  </a>
+                </li>
+                <li id="web-row" hidden>
+                  <a id="web-link" rel="noopener">
+                    <span class="icon" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm6.9 6h-3a15.6 15.6 0 0 0-1.4-3.6A8 8 0 0 1 18.9 8zM12 4a14 14 0 0 1 1.9 4h-3.8A14 14 0 0 1 12 4zM4.3 14a8.2 8.2 0 0 1 0-4h3.4a16.5 16.5 0 0 0 0 4zm.8 2h3a15.6 15.6 0 0 0 1.4 3.6A8 8 0 0 1 5.1 16zm3-8h-3a8 8 0 0 1 4.4-3.6A15.6 15.6 0 0 0 8.1 8zM12 20a14 14 0 0 1-1.9-4h3.8A14 14 0 0 1 12 20zm2.3-6H9.7a14.7 14.7 0 0 1 0-4h4.6a14.7 14.7 0 0 1 0 4zm.3 5.6a15.6 15.6 0 0 0 1.4-3.6h3a8 8 0 0 1-4.4 3.6zm1.7-5.6a16.5 16.5 0 0 0 0-4h3.4a8.2 8.2 0 0 1 0 4z"/></svg>
+                    </span>
+                    <span><span class="label">Website</span><span class="value" id="website"></span></span>
+                  </a>
+                </li>
+              </ul>
+
+              <div class="qr-mini-wrap">
+                <button type="button" class="qr-mini" id="qr-mini" aria-label="Enlarge QR code">
+                  <canvas id="qr-mini-canvas" aria-hidden="true"></canvas>
+                </button>
+                <p class="qr-mini-text"><strong>Scan to save contact</strong>Tap the code to make it bigger.</p>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
 
       <div class="actions">
-        <button type="button" class="btn btn-primary" id="save-contact" aria-describedby="status">Save contact</button>
-        <button type="button" class="btn btn-secondary btn-qr" id="show-qr" aria-haspopup="dialog">
-          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 3h8v8H3zm2 2v4h4V5zm8-2h8v8h-8zm2 2v4h4V5zM3 13h8v8H3zm2 2v4h4v-4zm8-2h2v2h-2zm2 2h2v2h-2zm2-2h2v2h-2zm2 2h2v2h-2zm-6 2h2v2h-2zm2 2h2v2h-2zm2-2h2v2h-2zm2 2h2v2h-2z"/></svg>
-          Show QR code
+        <button type="button" class="btn btn-primary reveal" style="--i: 8;" id="save-contact" aria-describedby="status">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/></svg>
+          Save contact
         </button>
-        <a class="btn btn-wallet" id="wallet" rel="noopener" aria-label="Add this card to Google Wallet" hidden>Add to Wallet</a>
-        <a class="btn btn-link company-link" rel="noopener">Visit PyraHash</a>
+        <div class="btn-row reveal" style="--i: 9;">
+          <button type="button" class="btn btn-secondary" id="show-qr" aria-haspopup="dialog">
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 3h8v8H3zm2 2v4h4V5zm8-2h8v8h-8zm2 2v4h4V5zM3 13h8v8H3zm2 2v4h4v-4zm8-2h2v2h-2zm2 2h2v2h-2zm2-2h2v2h-2zm2 2h2v2h-2zm-6 2h2v2h-2zm2 2h2v2h-2zm2-2h2v2h-2zm2 2h2v2h-2z"/></svg>
+            QR code
+          </button>
+          <button type="button" class="btn btn-secondary" id="flip-button" aria-controls="flipper">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 0 1 15.5-6.3L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15.5 6.3L3 16"/><path d="M3 21v-5h5"/></svg>
+            <span id="flip-button-label">Details</span>
+          </button>
+        </div>
+        <a class="btn btn-wallet reveal" style="--i: 10;" id="wallet" rel="noopener" aria-label="Add this card to Google Wallet" hidden>Add to Wallet</a>
+        <a class="btn btn-link company-link reveal" style="--i: 11;" rel="noopener">Visit PyraHash</a>
       </div>
       <p class="status" id="status" role="status" aria-live="polite">
         <span id="fallback" hidden>Download didn't start? <a id="fallback-link">Get the contact file</a>.</span>
@@ -323,17 +447,23 @@
     </div>
 
     <!-- Not found / error -->
-    <section class="message" id="message-view" aria-labelledby="msg-title" hidden>
-      <h1 id="msg-title"></h1>
-      <p id="msg-body"></p>
-      <div class="actions">
-        <button type="button" class="btn btn-primary" id="retry" hidden>Try again</button>
-        <a class="btn btn-secondary company-link" rel="noopener">Visit PyraHash</a>
+    <section class="face message" id="message-view" aria-labelledby="msg-title" hidden>
+      <div class="face-inner">
+        <div class="brand">
+          <img class="js-logo" alt="" hidden>
+          <span class="js-company">PyraHash</span>
+        </div>
+        <h1 id="msg-title"></h1>
+        <p id="msg-body"></p>
+        <div class="actions">
+          <button type="button" class="btn btn-primary" id="retry" hidden>Try again</button>
+          <a class="btn btn-secondary company-link" rel="noopener">Visit PyraHash</a>
+        </div>
       </div>
     </section>
   </main>
 
-  <!-- QR code to show a client in person -->
+  <!-- Large QR code to show a client in person -->
   <dialog class="qr" id="qr-dialog" aria-labelledby="qr-title" aria-describedby="qr-hint">
     <h2 id="qr-title">Scan to save contact</h2>
     <p id="qr-hint">Ask them to point their phone camera at this code.</p>
@@ -357,6 +487,8 @@
 
       var SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
       var $ = function (id) { return document.getElementById(id); };
+      var $$ = function (sel) { return Array.prototype.slice.call(document.querySelectorAll(sel)); };
+      var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
       // ---- Read and validate the slug ----------------------------------------
       function getSlug() {
@@ -375,22 +507,20 @@
       function show(el, on) { el.hidden = !on; }
       function setText(id, text) { var el = $(id); el.textContent = text || ''; show(el, !!text); }
 
+      // ---- Company branding (logo replaces the name when it loads) ----------
       function setCompany(data) {
         var name = data.companyName || 'PyraHash';
         var url = isWeb(data.companyUrl) ? data.companyUrl : DEFAULT_COMPANY_URL;
-        $('company').textContent = name;
-        Array.prototype.forEach.call(document.querySelectorAll('.company-link'), function (a) {
-          a.href = url;
-          a.textContent = 'Visit ' + name;
-        });
-        // Show the logo on its own (it already contains the name). The text
-        // name is only shown when there is no logo or it fails to load.
+        $$('.js-company').forEach(function (el) { el.textContent = name; });
+        $$('.company-link').forEach(function (a) { a.href = url; a.textContent = 'Visit ' + name; });
         if (isHttps(data.logoUrl)) {
-          var logo = $('logo');
-          logo.onload = function () { show(logo, true); show($('company'), false); };
-          logo.onerror = function () { show(logo, false); show($('company'), true); };
-          logo.alt = name;
-          logo.src = data.logoUrl;
+          $$('.js-logo').forEach(function (logo) {
+            var text = logo.nextElementSibling;
+            logo.onload = function () { show(logo, true); show(text, false); };
+            logo.onerror = function () { show(logo, false); show(text, true); };
+            logo.alt = name;
+            logo.src = data.logoUrl;
+          });
         }
         if (isHex(data.accent)) document.documentElement.style.setProperty('--accent', data.accent);
         if (isHex(data.onAccent)) document.documentElement.style.setProperty('--on-accent', data.onAccent);
@@ -398,7 +528,7 @@
 
       function finish() {
         show($('loading'), false);
-        $('card').setAttribute('aria-busy', 'false');
+        $('stage').setAttribute('aria-busy', 'false');
       }
 
       function showMessage(title, body, canRetry) {
@@ -408,16 +538,45 @@
         $('msg-body').textContent = body;
         show($('retry'), canRetry);
         show($('message-view'), true);
-        document.title = title + ' | ' + $('company').textContent;
+        document.title = title + ' | ' + ($$('.js-company')[0].textContent || 'PyraHash');
       }
+
+      // ---- Flip ---------------------------------------------------------------
+      var flipped = false;
+
+      function setFlipped(on, moveFocus) {
+        flipped = on;
+        var flipper = $('flipper');
+        flipper.classList.remove('peek');
+        flipper.classList.toggle('is-flipped', on);
+        // Only the visible face can be reached by keyboard and screen readers.
+        [[$('front'), !on], [$('back'), on]].forEach(function (pair) {
+          var face = pair[0], visible = pair[1];
+          if (visible) { face.removeAttribute('inert'); face.removeAttribute('aria-hidden'); }
+          else { face.setAttribute('inert', ''); face.setAttribute('aria-hidden', 'true'); }
+        });
+        $('flip-button-label').textContent = on ? 'Front' : 'Details';
+        $('flip-button').setAttribute('aria-label', on ? 'Show front of card' : 'Show contact details');
+        if (moveFocus) $(on ? 'flip-to-front' : 'flip-to-back').focus({ preventScroll: true });
+      }
+
+      // Tapping an empty part of the card flips it; links and buttons work as usual.
+      $('flipper').addEventListener('click', function (e) {
+        if (e.target.closest('a, button')) return;
+        setFlipped(!flipped, false);
+      });
+      $('flip-to-back').addEventListener('click', function () { setFlipped(true, true); });
+      $('flip-to-front').addEventListener('click', function () { setFlipped(false, true); });
+      $('flip-button').addEventListener('click', function () { setFlipped(!flipped, false); });
 
       // ---- Render a found card -----------------------------------------------
       function renderCard(d) {
         finish();
         $('name').textContent = d.name || '';
+        $('back-name').textContent = [d.name, d.title].filter(Boolean).join(' · ');
         setText('title', d.title);
         setText('dept', d.department);
-        document.title = (d.name || 'Name card') + ' | ' + $('company').textContent;
+        document.title = (d.name || 'Name card') + ' | ' + ($$('.js-company')[0].textContent || 'PyraHash');
 
         if (isHttps(d.photoUrl)) {
           $('photo').src = d.photoUrl;
@@ -445,11 +604,35 @@
         }
         if (isHttps(d.vcardFallbackUrl)) $('fallback-link').href = d.vcardFallbackUrl;
 
+        qrData = {
+          name: d.name || '',
+          vcard: String(d.vcard || '').replace(/\r?\n/g, '\r\n').replace(/\r\n$/, ''),
+          link: cardLink(),
+        };
+        drawQr($('qr-mini-canvas'), qrData.vcard, 104);
+
         $('save-contact').onclick = function () { saveContact(d); };
-        $('show-qr').onclick = function () { openQr(d); };
+        $('show-qr').onclick = function () { openQr(); };
+        $('qr-mini').onclick = function () { openQr(); };
+
         show($('message-view'), false);
         show($('profile-view'), true);
+        playEntrance();
       }
+
+      // Staggered entrance, then a small "peek" that hints the card can flip.
+      function playEntrance() {
+        requestAnimationFrame(function () {
+          $('stage').classList.add('is-ready');
+          if (reduceMotion) return;
+          setTimeout(function () {
+            if (!flipped) $('flipper').classList.add('peek');
+          }, 1500);
+        });
+      }
+      $('flipper').addEventListener('animationend', function (e) {
+        if (e.animationName === 'peek') this.classList.remove('peek');
+      });
 
       // ---- Save contact: build the .vcf in the browser -----------------------
       function saveContact(d) {
@@ -472,22 +655,25 @@
         if ($('fallback-link').href) show($('fallback'), true);
       }
 
-      // ---- QR code to show in person -----------------------------------------
+      // ---- QR codes -----------------------------------------------------------
       // "Contact" puts the vCard itself in the QR, so the client's camera
       // offers "Add to contacts" straight away (works offline).
       // "Card link" puts this page's URL in the QR instead.
       var qrData = null;
 
-      function drawQr(text) {
-        var canvas = $('qr-canvas');
-        if (typeof qrcode !== 'function') return;
+      function cardLink() {
+        var base = location.origin + location.pathname;
+        return /[?&]card=/.test(location.search) ? base + '?card=' + encodeURIComponent(getSlug()) : base;
+      }
+
+      function drawQr(canvas, text, cssSize) {
+        if (typeof qrcode !== 'function' || !text) return;
         qrcode.stringToBytes = qrcode.stringToBytesFuncs['UTF-8'];
         var qr = qrcode(0, 'M');
         qr.addData(text, 'Byte');
         qr.make();
         var count = qr.getModuleCount();
-        var cssSize = 260;
-        var scale = Math.max(1, Math.floor((cssSize * (window.devicePixelRatio || 1)) / count));
+        var scale = Math.max(1, Math.ceil((cssSize * (window.devicePixelRatio || 1)) / count));
         canvas.width = canvas.height = count * scale;
         var ctx = canvas.getContext('2d');
         ctx.fillStyle = '#ffffff';
@@ -508,17 +694,13 @@
         $('qr-canvas').setAttribute('aria-label', contact
           ? 'QR code containing contact details for ' + qrData.name
           : 'QR code linking to this name card');
-        drawQr(contact ? qrData.vcard : qrData.link);
+        drawQr($('qr-canvas'), contact ? qrData.vcard : qrData.link, 260);
       }
 
-      function openQr(d) {
-        var slug = getSlug();
-        var base = location.origin + location.pathname;
-        qrData = {
-          name: d.name || '',
-          vcard: String(d.vcard || '').replace(/\r?\n/g, '\r\n').replace(/\r\n$/, ''),
-          link: /[?&]card=/.test(location.search) ? base + '?card=' + encodeURIComponent(slug) : base,
-        };
+      var qrOpener = null;
+      function openQr() {
+        if (!qrData) return;
+        qrOpener = document.activeElement;
         setQrMode('contact');
         var dlg = $('qr-dialog');
         if (typeof dlg.showModal === 'function') dlg.showModal(); else dlg.setAttribute('open', '');
@@ -527,20 +709,22 @@
       function closeQr() {
         var dlg = $('qr-dialog');
         if (typeof dlg.close === 'function') dlg.close(); else dlg.removeAttribute('open');
-        $('show-qr').focus();
       }
 
       $('qr-mode-contact').addEventListener('click', function () { setQrMode('contact'); });
       $('qr-mode-link').addEventListener('click', function () { setQrMode('link'); });
       $('qr-close').addEventListener('click', closeQr);
       $('qr-dialog').addEventListener('click', function (e) { if (e.target === this) closeQr(); });
+      $('qr-dialog').addEventListener('close', function () {
+        if (qrOpener && qrOpener.focus) qrOpener.focus({ preventScroll: true });
+      });
 
       // ---- Fetch the card data -----------------------------------------------
       function load() {
         var slug = getSlug();
         show($('message-view'), false);
         show($('loading'), true);
-        $('card').setAttribute('aria-busy', 'true');
+        $('stage').setAttribute('aria-busy', 'true');
 
         if (!slug) {
           showMessage('Card not found', 'This link doesn’t point to a name card. Please check the QR code or link.', false);
@@ -580,9 +764,10 @@
       load();
     })();
   </script>
+
   <!--
     Bundled third-party library: qrcode-generator 1.4.4 by Kazuhiko Arase (MIT licence).
-    Included inline so the page is a single file with no external requests.
+    Included inline so the page stays a single file.
     You don't need to edit anything below this line.
   -->
   <script>
