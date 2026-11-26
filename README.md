@@ -126,6 +126,12 @@ Visitor scans QR ─► https://pyrahash.com/card?card=jane-doe   (web/card/inde
 
 The page is standalone. It is not a section of your landing page, and it doesn't need the site's framework. The "Visit PyraHash" button links back to the landing page. If you want prettier links such as `/card/jane-doe`, add a rewrite from `/card/*` to `/card/index.html` on your host. The page reads the slug from either form.
 
+**Show QR code (in person).** The card has a **Show QR code** button that opens a large QR code for a client to scan:
+- **Contact** (default): the QR holds the contact details themselves (vCard). The client's phone camera offers **Add to contacts** straight away, with no web page or internet needed.
+- **Card link**: the QR opens this online card instead.
+
+The QR library (qrcode-generator 1.4.4, MIT) is bundled inside `index.html`, so the page still makes no third-party requests.
+
 Sheet edits show up on the card immediately. Only code changes in Apps Script need a new deployment version, and the `/exec` URL stays the same.
 
 ### 6. QR codes (one per slug)
