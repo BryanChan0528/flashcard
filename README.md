@@ -13,6 +13,7 @@ Admins manage everything from a Google Sheet. A **Wallet** menu in the sheet cre
 | File | Purpose |
 | --- | --- |
 | `Code.gs` | Apps Script. It serves the web app (`doGet`), adds the sheet menu, creates and patches Wallet passes, signs JWTs and gets OAuth tokens. |
+| `web/card/index.html` | Card page for hosting on pyrahash.com (fetches JSON from Apps Script). |
 | `Card.html` | Card page template (mobile-first, light and dark mode, no frameworks). |
 | `appsscript.json` | Manifest with the OAuth scopes and web app settings (runs as the owner, open to anyone). |
 | `.claspignore` | Optional. Limits what [`clasp`](https://github.com/google/clasp) pushes. |
@@ -104,6 +105,28 @@ The card page reads only the non-secret properties. The service account key is r
 - [ ] After code changes, use **Deploy › Manage deployments › Edit › New version** to keep the same URL. A new deployment gets a new URL and breaks the printed QR codes.
 
 Visit `<exec URL>?card=does-not-exist` to check that the "Card not found" page appears.
+
+### 5b. Host the card page on pyrahash.com (recommended)
+
+Visitors then see `pyrahash.com` in the address bar, with no Google banner. The page on your site fetches the card data from Apps Script (`?format=json`) and draws the card itself.
+
+```
+Visitor scans QR ─► https://pyrahash.com/card?card=jane-doe   (web/card/index.html on your site)
+                         │ fetch
+                         ▼
+                    <exec URL>?format=json&card=jane-doe       (Apps Script reads the sheet)
+```
+
+- [ ] Open `web/card/index.html` and set `API_URL` to your `/exec` URL. Don't use the `/dev` URL: only you can open it.
+- [ ] Add the file to your website so it is served at `/card`:
+  - **Vite / React / Vue project:** copy it to `public/card/index.html`. Vite copies `public/` as is, so after the next build and deploy it is live at `https://pyrahash.com/card/`.
+  - **Plain static site or cPanel:** upload it as `card/index.html` in the site root.
+- [ ] Set the Script Property `BASE_URL` to `https://pyrahash.com/card`, so Wallet passes link to your domain.
+- [ ] Test `https://pyrahash.com/card?card=test-user` on your phone.
+
+The page is standalone. It is not a section of your landing page, and it doesn't need the site's framework. The "Visit PyraHash" button links back to the landing page. If you want prettier links such as `/card/jane-doe`, add a rewrite from `/card/*` to `/card/index.html` on your host. The page reads the slug from either form.
+
+Sheet edits show up on the card immediately. Only code changes in Apps Script need a new deployment version, and the `/exec` URL stays the same.
 
 ### 6. QR codes (one per slug)
 

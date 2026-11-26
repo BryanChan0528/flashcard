@@ -177,10 +177,11 @@ function updateWalletPasses() {
  * ========================================================================= */
 
 /**
- * Entry point for the public card page.
- *   ?card=<slug>              -> HTML card page
- *   ?card=<slug>&format=vcf   -> .vcf download (fallback for browsers that
- *                                block downloads inside the Apps Script frame)
+ * Entry point for the web app.
+ *   ?card=<slug>               -> HTML card page (served by Apps Script)
+ *   ?card=<slug>&format=json   -> card data as JSON, used by the card page
+ *                                 hosted on pyrahash.com (web/card/index.html)
+ *   ?card=<slug>&format=vcf    -> .vcf download
  * `<web app URL>/<slug>` also works (Apps Script passes it as e.pathInfo).
  */
 function doGet(e) {
@@ -188,6 +189,14 @@ function doGet(e) {
   const slug = parseSlug_(params.card || (e && e.pathInfo) || '');
   const cfg = getConfig_();
   const emp = slug ? findEmployeeBySlug_(slug) : null;
+
+  if (params.format === 'json') {
+    // Responses from ContentService are served from
+    // script.googleusercontent.com with "Access-Control-Allow-Origin: *",
+    // so the page on pyrahash.com can fetch this with a plain GET.
+    return ContentService.createTextOutput(JSON.stringify(buildCardData_(emp, cfg)))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
 
   if (emp && params.format === 'vcf') {
     return ContentService.createTextOutput(buildVCard_(emp, cfg.companyName))
@@ -198,14 +207,23 @@ function doGet(e) {
   return renderCardPage_(emp, cfg);
 }
 
-/**
- * Builds the template data and renders Card.html. Only the fields the page
- * needs are passed to the template. Values are printed with <?= ?>, which
- * HtmlService escapes for the surrounding context. URLs are also checked here
- * so only http(s), tel: and mailto: links reach the page.
- */
+/** Renders Card.html. Values are printed with escaping scriptlets. */
 function renderCardPage_(emp, cfg) {
   const tpl = HtmlService.createTemplateFromFile('Card');
+  tpl.d = buildCardData_(emp, cfg);
+  const title = emp ? emp.fullName + ' | ' + cfg.companyName : 'Card not found | ' + cfg.companyName;
+  return tpl.evaluate()
+    .setTitle(title)
+    .addMetaTag('viewport', 'width=device-width, initial-scale=1, viewport-fit=cover');
+}
+
+/**
+ * The public data for one card. This is the ONLY data that leaves the sheet:
+ * it is used by both the Apps Script page and the JSON endpoint. URLs are
+ * checked here so only http(s), tel: and mailto: links are returned. The
+ * Wallet Object ID is never included.
+ */
+function buildCardData_(emp, cfg) {
   const d = {
     found: !!emp,
     companyName: cfg.companyName,
@@ -238,12 +256,7 @@ function renderCardPage_(emp, cfg) {
     // Only accept genuine Google Wallet save links from the sheet.
     d.walletLink = emp.saveLink.indexOf(SAVE_URL_PREFIX) === 0 ? emp.saveLink : '';
   }
-
-  tpl.d = d;
-  const title = emp ? emp.fullName + ' | ' + cfg.companyName : 'Card not found | ' + cfg.companyName;
-  return tpl.evaluate()
-    .setTitle(title)
-    .addMetaTag('viewport', 'width=device-width, initial-scale=1, viewport-fit=cover');
+  return d;
 }
 
 /**

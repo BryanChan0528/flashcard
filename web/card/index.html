@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex">
+  <title>PyraHash name card</title>
+  <!--
+    PyraHash digital name card, hosted on pyrahash.com.
+    Reads the slug from ?card=<slug> (or /card/<slug> if your host rewrites
+    that path to this file), fetches the card data from the Apps Script
+    JSON endpoint, and renders it. All values are inserted with textContent
+    or checked URL attributes, never as HTML.
+
+    SETUP: set API_URL below to your Apps Script web app URL (ends in /exec).
+  -->
+  <style>
+    :root {
+      --accent: #00e5ff;
+      --on-accent: #111111;
+      --bg: #f2f4f7;
+      --surface: #ffffff;
+      --text: #1b1f24;
+      --muted: #4a5360;
+      --border: #d9dee5;
+      --focus: #0b57d0;
+      --wallet-bg: #1f1f1f;
+      --wallet-text: #ffffff;
+      --skeleton: #e6e9ee;
+      color-scheme: light dark;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #07090f;
+        --surface: #12161d;
+        --text: #eef1f4;
+        --muted: #b4bcc6;
+        --border: #2a313b;
+        --focus: #a8c7fa;
+        --wallet-bg: #ffffff;
+        --wallet-text: #1f1f1f;
+        --skeleton: #222831;
+      }
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body { margin: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      min-height: 100vh;
+      padding: 16px 16px calc(24px + env(safe-area-inset-bottom));
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+    }
+    [hidden] { display: none !important; }
+    .card {
+      width: 100%;
+      max-width: 440px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      overflow: hidden;
+      box-shadow: 0 8px 28px rgba(0, 0, 0, .08);
+    }
+    .brand {
+      background: var(--accent);
+      color: var(--on-accent);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 18px 20px 56px;
+    }
+    .brand img { height: 36px; width: auto; max-width: 140px; object-fit: contain; }
+    .brand span { font-weight: 600; font-size: 1.05rem; letter-spacing: .01em; }
+    .profile { padding: 0 20px 8px; text-align: center; }
+    .avatar {
+      width: 104px; height: 104px;
+      margin: -52px auto 12px;
+      border-radius: 50%;
+      border: 4px solid var(--surface);
+      background: var(--accent);
+      color: var(--on-accent);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 2rem; font-weight: 600;
+      overflow: hidden;
+    }
+    .avatar img { width: 100%; height: 100%; object-fit: cover; }
+    h1 { font-size: 1.5rem; line-height: 1.25; margin: 0 0 4px; overflow-wrap: anywhere; }
+    .title { margin: 0; font-weight: 500; overflow-wrap: anywhere; }
+    .dept { margin: 2px 0 0; color: var(--muted); overflow-wrap: anywhere; }
+    .contacts { list-style: none; margin: 20px 0 0; padding: 0 20px; }
+    .contacts li + li { border-top: 1px solid var(--border); }
+    .contacts a {
+      display: flex; align-items: center; gap: 14px;
+      min-height: 52px; padding: 8px 4px;
+      color: var(--text); text-decoration: none;
+      border-radius: 8px;
+    }
+    .contacts a:hover .value { text-decoration: underline; }
+    .icon {
+      flex: none; width: 36px; height: 36px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      background: var(--accent); color: var(--on-accent);
+    }
+    .icon svg { width: 18px; height: 18px; }
+    .label { display: block; font-size: .8rem; color: var(--muted); }
+    .value { display: block; overflow-wrap: anywhere; }
+    .actions { display: grid; gap: 10px; padding: 20px; }
+    .btn {
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      min-height: 48px; padding: 12px 16px;
+      border-radius: 999px; border: 1px solid transparent;
+      font: inherit; font-weight: 600; text-decoration: none; text-align: center;
+      cursor: pointer;
+    }
+    .btn-primary { background: var(--accent); color: var(--on-accent); }
+    .btn-wallet { background: var(--wallet-bg); color: var(--wallet-text); }
+    .btn-secondary { background: transparent; color: var(--text); border-color: var(--border); }
+    .btn:hover { filter: brightness(1.06); }
+    a:focus-visible, button:focus-visible {
+      outline: 3px solid var(--focus);
+      outline-offset: 3px;
+    }
+    .status { min-height: 1.5em; margin: 0; padding: 0 20px 4px; font-size: .9rem; color: var(--muted); text-align: center; }
+    .status a { color: inherit; }
+    .message { padding: 8px 24px 28px; text-align: center; }
+    .message h1 { margin-top: 4px; }
+    .message p { color: var(--muted); }
+    .message .actions { padding: 8px 0 0; }
+    .skeleton { padding: 0 20px 28px; text-align: center; }
+    .skeleton .avatar { background: var(--skeleton); }
+    .bar { height: 14px; border-radius: 7px; background: var(--skeleton); margin: 10px auto; }
+    @media (prefers-reduced-motion: no-preference) {
+      .btn { transition: filter .15s ease; }
+      .skeleton .avatar, .bar { animation: pulse 1.2s ease-in-out infinite; }
+      @keyframes pulse { 50% { opacity: .5; } }
+    }
+  </style>
+</head>
+<body>
+  <main class="card" aria-busy="true" id="card">
+    <header class="brand">
+      <img id="logo" alt="" hidden>
+      <span id="company">PyraHash</span>
+    </header>
+
+    <!-- Loading state -->
+    <div class="skeleton" id="loading" role="status" aria-label="Loading name card">
+      <div class="avatar"></div>
+      <div class="bar" style="width: 60%;"></div>
+      <div class="bar" style="width: 40%;"></div>
+    </div>
+
+    <!-- Card -->
+    <div id="profile-view" hidden>
+      <section class="profile" aria-labelledby="name">
+        <div class="avatar">
+          <img id="photo" alt="" hidden>
+          <span id="initials" aria-hidden="true"></span>
+        </div>
+        <h1 id="name"></h1>
+        <p class="title" id="title" hidden></p>
+        <p class="dept" id="dept" hidden></p>
+      </section>
+
+      <ul class="contacts" id="contacts" aria-label="Contact details" hidden>
+        <li id="phone-row" hidden>
+          <a id="phone-link">
+            <span class="icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.25 11.4 11.4 0 0 0 3.6.57 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.45.57 3.57a1 1 0 0 1-.25 1z"/></svg>
+            </span>
+            <span><span class="label">Phone</span><span class="value" id="phone"></span></span>
+          </a>
+        </li>
+        <li id="email-row" hidden>
+          <a id="email-link">
+            <span class="icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2zm0 4-8 5-8-5V6l8 5 8-5z"/></svg>
+            </span>
+            <span><span class="label">Email</span><span class="value" id="email"></span></span>
+          </a>
+        </li>
+        <li id="web-row" hidden>
+          <a id="web-link" rel="noopener">
+            <span class="icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm6.9 6h-3a15.6 15.6 0 0 0-1.4-3.6A8 8 0 0 1 18.9 8zM12 4a14 14 0 0 1 1.9 4h-3.8A14 14 0 0 1 12 4zM4.3 14a8.2 8.2 0 0 1 0-4h3.4a16.5 16.5 0 0 0 0 4zm.8 2h3a15.6 15.6 0 0 0 1.4 3.6A8 8 0 0 1 5.1 16zm3-8h-3a8 8 0 0 1 4.4-3.6A15.6 15.6 0 0 0 8.1 8zM12 20a14 14 0 0 1-1.9-4h3.8A14 14 0 0 1 12 20zm2.3-6H9.7a14.7 14.7 0 0 1 0-4h4.6a14.7 14.7 0 0 1 0 4zm.3 5.6a15.6 15.6 0 0 0 1.4-3.6h3a8 8 0 0 1-4.4 3.6zm1.7-5.6a16.5 16.5 0 0 0 0-4h3.4a8.2 8.2 0 0 1 0 4z"/></svg>
+            </span>
+            <span><span class="label">Website</span><span class="value" id="website"></span></span>
+          </a>
+        </li>
+      </ul>
+
+      <div class="actions">
+        <button type="button" class="btn btn-primary" id="save-contact" aria-describedby="status">Save contact</button>
+        <a class="btn btn-wallet" id="wallet" rel="noopener" aria-label="Add this card to Google Wallet" hidden>Add to Wallet</a>
+        <a class="btn btn-secondary company-link" rel="noopener">Visit PyraHash</a>
+      </div>
+      <p class="status" id="status" role="status" aria-live="polite">
+        <span id="fallback" hidden>Download didn't start? <a id="fallback-link">Get the contact file</a>.</span>
+        <span id="status-text"></span>
+      </p>
+    </div>
+
+    <!-- Not found / error -->
+    <section class="message" id="message-view" aria-labelledby="msg-title" hidden>
+      <h1 id="msg-title"></h1>
+      <p id="msg-body"></p>
+      <div class="actions">
+        <button type="button" class="btn btn-primary" id="retry" hidden>Try again</button>
+        <a class="btn btn-secondary company-link" rel="noopener">Visit PyraHash</a>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    (function () {
+      'use strict';
+
+      // ---- Configuration ---------------------------------------------------
+      // Your Apps Script web app URL (Deploy > Manage deployments). Ends in /exec.
+      var API_URL = 'https://script.google.com/macros/s/REPLACE_WITH_DEPLOYMENT_ID/exec';
+      var DEFAULT_COMPANY_URL = 'https://pyrahash.com';
+      var TIMEOUT_MS = 15000;
+
+      var SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+      var $ = function (id) { return document.getElementById(id); };
+
+      // ---- Read and validate the slug ----------------------------------------
+      function getSlug() {
+        var fromQuery = new URLSearchParams(location.search).get('card');
+        var fromPath = location.pathname.replace(/\/+$/, '').split('/').pop();
+        var raw = (fromQuery || (fromPath !== 'card' && fromPath !== 'index.html' ? fromPath : '') || '')
+          .trim().toLowerCase();
+        return raw.length <= 64 && SLUG_RE.test(raw) ? raw : '';
+      }
+
+      // ---- URL and colour checks (the server checks these too) ---------------
+      function isHttps(u) { return typeof u === 'string' && /^https:\/\/[^\s"'<>]+$/i.test(u); }
+      function isWeb(u) { return typeof u === 'string' && /^https?:\/\/[^\s"'<>]+$/i.test(u); }
+      function isHex(c) { return typeof c === 'string' && /^#[0-9a-f]{6}$/i.test(c); }
+
+      function show(el, on) { el.hidden = !on; }
+      function setText(id, text) { var el = $(id); el.textContent = text || ''; show(el, !!text); }
+
+      function setCompany(data) {
+        var name = data.companyName || 'PyraHash';
+        var url = isWeb(data.companyUrl) ? data.companyUrl : DEFAULT_COMPANY_URL;
+        $('company').textContent = name;
+        Array.prototype.forEach.call(document.querySelectorAll('.company-link'), function (a) {
+          a.href = url;
+          a.textContent = 'Visit ' + name;
+        });
+        if (isHttps(data.logoUrl)) {
+          $('logo').src = data.logoUrl;
+          $('logo').alt = name + ' logo';
+          show($('logo'), true);
+        }
+        if (isHex(data.accent)) document.documentElement.style.setProperty('--accent', data.accent);
+        if (isHex(data.onAccent)) document.documentElement.style.setProperty('--on-accent', data.onAccent);
+      }
+
+      function finish() {
+        show($('loading'), false);
+        $('card').setAttribute('aria-busy', 'false');
+      }
+
+      function showMessage(title, body, canRetry) {
+        finish();
+        show($('profile-view'), false);
+        $('msg-title').textContent = title;
+        $('msg-body').textContent = body;
+        show($('retry'), canRetry);
+        show($('message-view'), true);
+        document.title = title + ' | ' + $('company').textContent;
+      }
+
+      // ---- Render a found card -----------------------------------------------
+      function renderCard(d) {
+        finish();
+        $('name').textContent = d.name || '';
+        setText('title', d.title);
+        setText('dept', d.department);
+        document.title = (d.name || 'Name card') + ' | ' + $('company').textContent;
+
+        if (isHttps(d.photoUrl)) {
+          $('photo').src = d.photoUrl;
+          $('photo').alt = 'Photo of ' + d.name;
+          show($('photo'), true);
+          show($('initials'), false);
+        } else {
+          $('initials').textContent = d.initials || '';
+        }
+
+        var hasPhone = typeof d.phoneHref === 'string' && /^tel:\+?\d+$/.test(d.phoneHref);
+        var hasEmail = typeof d.emailHref === 'string' && /^mailto:[^\s<>"]+$/.test(d.emailHref);
+        var hasWeb = isWeb(d.website);
+        if (hasPhone) { $('phone-link').href = d.phoneHref; $('phone').textContent = d.phone; }
+        if (hasEmail) { $('email-link').href = d.emailHref; $('email').textContent = d.email; }
+        if (hasWeb) { $('web-link').href = d.website; $('website').textContent = d.websiteLabel || d.website; }
+        show($('phone-row'), hasPhone);
+        show($('email-row'), hasEmail);
+        show($('web-row'), hasWeb);
+        show($('contacts'), hasPhone || hasEmail || hasWeb);
+
+        if (typeof d.walletLink === 'string' && d.walletLink.indexOf('https://pay.google.com/gp/v/save/') === 0) {
+          $('wallet').href = d.walletLink;
+          show($('wallet'), true);
+        }
+        if (isHttps(d.vcardFallbackUrl)) $('fallback-link').href = d.vcardFallbackUrl;
+
+        $('save-contact').onclick = function () { saveContact(d); };
+        show($('message-view'), false);
+        show($('profile-view'), true);
+      }
+
+      // ---- Save contact: build the .vcf in the browser -----------------------
+      function saveContact(d) {
+        var text = String(d.vcard || '').replace(/\r?\n/g, '\r\n');
+        var name = d.vcardFilename || 'contact.vcf';
+        try {
+          var blob = new Blob([text], { type: 'text/vcard;charset=utf-8' });
+          var url = URL.createObjectURL(blob);
+          var a = document.createElement('a');
+          a.href = url;
+          a.download = name;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          setTimeout(function () { URL.revokeObjectURL(url); }, 10000);
+          $('status-text').textContent = 'Contact file ready. Open it to add it to your contacts.';
+        } catch (err) {
+          $('status-text').textContent = 'Your browser blocked the download.';
+        }
+        if ($('fallback-link').href) show($('fallback'), true);
+      }
+
+      // ---- Fetch the card data -----------------------------------------------
+      function load() {
+        var slug = getSlug();
+        show($('message-view'), false);
+        show($('loading'), true);
+        $('card').setAttribute('aria-busy', 'true');
+
+        if (!slug) {
+          showMessage('Card not found', 'This link doesn’t point to a name card. Please check the QR code or link.', false);
+          return;
+        }
+
+        var controller = 'AbortController' in window ? new AbortController() : null;
+        var timer = setTimeout(function () { if (controller) controller.abort(); }, TIMEOUT_MS);
+
+        fetch(API_URL + '?format=json&card=' + encodeURIComponent(slug), {
+          method: 'GET',
+          signal: controller ? controller.signal : undefined,
+        })
+          .then(function (res) {
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            return res.json();
+          })
+          .then(function (data) {
+            clearTimeout(timer);
+            setCompany(data || {});
+            if (data && data.found) {
+              renderCard(data);
+            } else {
+              showMessage('Card not found',
+                'We couldn’t find this name card. The link may be out of date, or the QR code may have been mistyped.',
+                false);
+            }
+          })
+          .catch(function () {
+            clearTimeout(timer);
+            showMessage('Couldn’t load this card',
+              'Please check your internet connection and try again.', true);
+          });
+      }
+
+      $('retry').addEventListener('click', load);
+      load();
+    })();
+  </script>
+</body>
+</html>
