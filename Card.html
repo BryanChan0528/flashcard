@@ -136,9 +136,12 @@
   <main class="card">
     <header class="brand">
       <? if (d.logoUrl) { ?>
-        <img src="<?= d.logoUrl ?>" alt="<?= d.companyName ?> logo">
+        <img src="<?= d.logoUrl ?>" alt="<?= d.companyName ?>"
+             onerror="this.hidden = true; this.nextElementSibling.hidden = false;">
+        <span hidden><?= d.companyName ?></span>
+      <? } else { ?>
+        <span><?= d.companyName ?></span>
       <? } ?>
-      <span><?= d.companyName ?></span>
     </header>
 
     <? if (d.found) { ?>

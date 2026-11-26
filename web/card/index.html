@@ -89,7 +89,7 @@
       gap: 10px;
       padding: 20px 20px 0;
     }
-    .brand img { height: 28px; width: auto; max-width: 140px; object-fit: contain; }
+    .brand img { display: block; height: 32px; width: auto; max-width: 180px; object-fit: contain; }
     .brand span {
       font-family: 'Space Grotesk', 'Inter', sans-serif;
       font-weight: 600;
@@ -383,10 +383,14 @@
           a.href = url;
           a.textContent = 'Visit ' + name;
         });
+        // Show the logo on its own (it already contains the name). The text
+        // name is only shown when there is no logo or it fails to load.
         if (isHttps(data.logoUrl)) {
-          $('logo').src = data.logoUrl;
-          $('logo').alt = name + ' logo';
-          show($('logo'), true);
+          var logo = $('logo');
+          logo.onload = function () { show(logo, true); show($('company'), false); };
+          logo.onerror = function () { show(logo, false); show($('company'), true); };
+          logo.alt = name;
+          logo.src = data.logoUrl;
         }
         if (isHex(data.accent)) document.documentElement.style.setProperty('--accent', data.accent);
         if (isHex(data.onAccent)) document.documentElement.style.setProperty('--on-accent', data.onAccent);
