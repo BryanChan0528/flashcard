@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <!--
+    Card page template, rendered by renderCardPage_() in Code.gs.
+    Every sheet value is printed with <?= ?>, which HtmlService escapes for
+    its context. The only unescaped prints (<?!= ?>) are the two colours,
+    which Code.gs has already checked against /^#[0-9a-f]{6}$/.
+  -->
+  <style>
+    :root {
+      --accent: <?!= d.accent ?>;
+      --on-accent: <?!= d.onAccent ?>;
+      --bg: #f2f4f7;
+      --surface: #ffffff;
+      --text: #1b1f24;
+      --muted: #4a5360;
+      --border: #d9dee5;
+      --focus: #0b57d0;
+      --wallet-bg: #1f1f1f;
+      --wallet-text: #ffffff;
+      color-scheme: light dark;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0f1215;
+        --surface: #1a1f24;
+        --text: #eef1f4;
+        --muted: #b4bcc6;
+        --border: #333b44;
+        --focus: #a8c7fa;
+        --wallet-bg: #ffffff;
+        --wallet-text: #1f1f1f;
+      }
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body { margin: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      min-height: 100vh;
+      padding: 16px 16px calc(24px + env(safe-area-inset-bottom));
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+    }
+    .card {
+      width: 100%;
+      max-width: 440px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      overflow: hidden;
+      box-shadow: 0 8px 28px rgba(0, 0, 0, .08);
+    }
+    .brand {
+      background: var(--accent);
+      color: var(--on-accent);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 18px 20px 56px;
+    }
+    .brand img { height: 36px; width: auto; max-width: 140px; object-fit: contain; }
+    .brand span { font-weight: 600; font-size: 1.05rem; letter-spacing: .01em; }
+    .profile { padding: 0 20px 8px; text-align: center; }
+    .avatar {
+      width: 104px; height: 104px;
+      margin: -52px auto 12px;
+      border-radius: 50%;
+      border: 4px solid var(--surface);
+      background: var(--accent);
+      color: var(--on-accent);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 2rem; font-weight: 600;
+      overflow: hidden;
+    }
+    .avatar img { width: 100%; height: 100%; object-fit: cover; }
+    h1 { font-size: 1.5rem; line-height: 1.25; margin: 0 0 4px; overflow-wrap: anywhere; }
+    .title { margin: 0; font-weight: 500; overflow-wrap: anywhere; }
+    .dept { margin: 2px 0 0; color: var(--muted); overflow-wrap: anywhere; }
+    .contacts { list-style: none; margin: 20px 0 0; padding: 0 20px; }
+    .contacts li + li { border-top: 1px solid var(--border); }
+    .contacts a {
+      display: flex; align-items: center; gap: 14px;
+      min-height: 52px; padding: 8px 4px;
+      color: var(--text); text-decoration: none;
+      border-radius: 8px;
+    }
+    .contacts a:hover .value { text-decoration: underline; }
+    .icon {
+      flex: none; width: 36px; height: 36px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      background: var(--accent); color: var(--on-accent);
+    }
+    .icon svg { width: 18px; height: 18px; }
+    .label { display: block; font-size: .8rem; color: var(--muted); }
+    .value { display: block; overflow-wrap: anywhere; }
+    .actions { display: grid; gap: 10px; padding: 20px; }
+    .btn {
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      min-height: 48px; padding: 12px 16px;
+      border-radius: 999px; border: 1px solid transparent;
+      font: inherit; font-weight: 600; text-decoration: none; text-align: center;
+      cursor: pointer;
+    }
+    .btn-primary { background: var(--accent); color: var(--on-accent); }
+    .btn-wallet { background: var(--wallet-bg); color: var(--wallet-text); }
+    .btn-secondary { background: transparent; color: var(--text); border-color: var(--border); }
+    .btn:hover { filter: brightness(1.06); }
+    a:focus-visible, button:focus-visible {
+      outline: 3px solid var(--focus);
+      outline-offset: 3px;
+    }
+    .status { min-height: 1.5em; margin: 0; padding: 0 20px; font-size: .9rem; color: var(--muted); text-align: center; }
+    .status a { color: inherit; }
+    .empty { padding: 8px 24px 28px; text-align: center; }
+    .empty h1 { margin-top: 4px; }
+    .empty p { color: var(--muted); }
+    .visually-hidden {
+      position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+      overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+    }
+    @media (prefers-reduced-motion: no-preference) {
+      .btn { transition: filter .15s ease; }
+    }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <header class="brand">
+      <? if (d.logoUrl) { ?>
+        <img src="<?= d.logoUrl ?>" alt="<?= d.companyName ?> logo">
+      <? } ?>
+      <span><?= d.companyName ?></span>
+    </header>
+
+    <? if (d.found) { ?>
+      <section class="profile" aria-labelledby="name">
+        <div class="avatar">
+          <? if (d.photoUrl) { ?>
+            <img src="<?= d.photoUrl ?>" alt="Photo of <?= d.name ?>">
+          <? } else { ?>
+            <span aria-hidden="true"><?= d.initials ?></span>
+          <? } ?>
+        </div>
+        <h1 id="name"><?= d.name ?></h1>
+        <? if (d.title) { ?><p class="title"><?= d.title ?></p><? } ?>
+        <? if (d.department) { ?><p class="dept"><?= d.department ?></p><? } ?>
+      </section>
+
+      <? if (d.phoneHref || d.emailHref || d.website) { ?>
+        <ul class="contacts" aria-label="Contact details">
+          <? if (d.phoneHref) { ?>
+            <li>
+              <a href="<?= d.phoneHref ?>">
+                <span class="icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.25 11.4 11.4 0 0 0 3.6.57 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.45.57 3.57a1 1 0 0 1-.25 1z"/></svg>
+                </span>
+                <span><span class="label">Phone</span><span class="value"><?= d.phone ?></span></span>
+              </a>
+            </li>
+          <? } ?>
+          <? if (d.emailHref) { ?>
+            <li>
+              <a href="<?= d.emailHref ?>">
+                <span class="icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2zm0 4-8 5-8-5V6l8 5 8-5z"/></svg>
+                </span>
+                <span><span class="label">Email</span><span class="value"><?= d.email ?></span></span>
+              </a>
+            </li>
+          <? } ?>
+          <? if (d.website) { ?>
+            <li>
+              <a href="<?= d.website ?>" rel="noopener">
+                <span class="icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm6.9 6h-3a15.6 15.6 0 0 0-1.4-3.6A8 8 0 0 1 18.9 8zM12 4a14 14 0 0 1 1.9 4h-3.8A14 14 0 0 1 12 4zM4.3 14a8.2 8.2 0 0 1 0-4h3.4a16.5 16.5 0 0 0 0 4zm.8 2h3a15.6 15.6 0 0 0 1.4 3.6A8 8 0 0 1 5.1 16zm3-8h-3a8 8 0 0 1 4.4-3.6A15.6 15.6 0 0 0 8.1 8zM12 20a14 14 0 0 1-1.9-4h3.8A14 14 0 0 1 12 20zm2.3-6H9.7a14.7 14.7 0 0 1 0-4h4.6a14.7 14.7 0 0 1 0 4zm.3 5.6a15.6 15.6 0 0 0 1.4-3.6h3a8 8 0 0 1-4.4 3.6zm1.7-5.6a16.5 16.5 0 0 0 0-4h3.4a8.2 8.2 0 0 1 0 4z"/></svg>
+                </span>
+                <span><span class="label">Website</span><span class="value"><?= d.websiteLabel ?></span></span>
+              </a>
+            </li>
+          <? } ?>
+        </ul>
+      <? } ?>
+
+      <div class="actions">
+        <button type="button" class="btn btn-primary" id="save-contact"
+                data-vcard="<?= d.vcard ?>" data-filename="<?= d.vcardFilename ?>"
+                aria-describedby="status">
+          Save contact
+        </button>
+        <? if (d.walletLink) { ?>
+          <a class="btn btn-wallet" href="<?= d.walletLink ?>" rel="noopener"
+             aria-label="Add this card to Google Wallet">Add to Wallet</a>
+        <? } ?>
+        <a class="btn btn-secondary" href="<?= d.companyUrl ?>" rel="noopener">Visit <?= d.companyName ?></a>
+      </div>
+      <p class="status" id="status" role="status" aria-live="polite">
+        <? if (d.vcardFallbackUrl) { ?>
+          <span id="fallback" hidden>Download didn't start? <a href="<?= d.vcardFallbackUrl ?>">Get the contact file</a>.</span>
+        <? } ?>
+        <span id="status-text"></span>
+      </p>
+    <? } else { ?>
+      <section class="empty" aria-labelledby="nf-title">
+        <h1 id="nf-title">Card not found</h1>
+        <p>We couldn't find this name card. The link may be out of date, or the QR code may have been mistyped.</p>
+        <div class="actions" style="padding: 8px 0 0;">
+          <a class="btn btn-primary" href="<?= d.companyUrl ?>" rel="noopener">Visit <?= d.companyName ?></a>
+        </div>
+      </section>
+    <? } ?>
+  </main>
+
+  <script>
+    // Builds the .vcf file in the browser from the vCard text that Code.gs
+    // put in the button's data attribute. No sheet data is placed in script.
+    (function () {
+      var btn = document.getElementById('save-contact');
+      if (!btn) return;
+      var statusText = document.getElementById('status-text');
+      var fallback = document.getElementById('fallback');
+
+      btn.addEventListener('click', function () {
+        // HTML parsing turns CRLF into LF; vCard wants CRLF.
+        var text = btn.getAttribute('data-vcard').replace(/\r?\n/g, '\r\n');
+        var name = btn.getAttribute('data-filename') || 'contact.vcf';
+        try {
+          var blob = new Blob([text], { type: 'text/vcard;charset=utf-8' });
+          var url = URL.createObjectURL(blob);
+          var a = document.createElement('a');
+          a.href = url;
+          a.download = name;
+          a.target = '_self';
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          setTimeout(function () { URL.revokeObjectURL(url); }, 10000);
+          statusText.textContent = 'Contact file ready. Open it to add it to your contacts.';
+        } catch (err) {
+          statusText.textContent = 'Your browser blocked the download.';
+        }
+        if (fallback) fallback.hidden = false;
+      });
+    })();
+  </script>
+</body>
+</html>
