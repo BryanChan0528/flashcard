@@ -44,7 +44,9 @@ design_policy jsonb: allowed theme ids, locked theme id or null, allow personal 
 card_events (view | save_contact | qr_open | whatsapp_click | wallet_click),
 leads (card_id, name, phone, email, note, consent_at), wallet_passes
 (card_id, object_id, save_link, synced_at, last_error), subscriptions (org_id,
-stripe ids, seats, status), audit_log (who changed what).
+stripe ids, seats, status), integrations (org_id, provider, connected_by,
+connected account email, granted scopes, encrypted refresh token, status,
+last_synced_at, last_error), audit_log (who changed what).
 
 ## Card design system (important: design is DATA, never HTML)
 - A card's look is a versioned `CardDesign` JSON object validated by a Zod schema,
@@ -61,6 +63,30 @@ stripe ids, seats, status), audit_log (who changed what).
 - Brand lock: admins choose which themes staff may use, or lock everyone to one.
   The server enforces the policy, not only the UI.
 - Theme picker in the staff dashboard with a live phone-sized preview.
+
+## Integrations (MVP part)
+- Sign in with Google (Supabase Auth) asking only for openid, email, profile.
+- "Import staff from Google Sheet": Google Picker + the `drive.file` scope only
+  (the user picks one spreadsheet; we can open only that file). Request the scope with
+  incremental authorization the first time someone clicks Import, not at sign-in.
+  Never request full Drive scopes (`drive`, `drive.readonly`): they are restricted and
+  need a paid yearly security assessment.
+- Reuse the CSV import preview/validation for Sheets imports (same column names as the
+  prototype's Employees tab; headers matched case-insensitively).
+- Optional "Keep in sync" for the picked sheet: scheduled re-import (every few hours)
+  that shows a diff (added, changed, removed) and applies only after admin approval
+  unless the admin turns on auto-apply.
+- Integration status UI: connected account, last sync time, staff count, Sync now,
+  Disconnect (revokes the token at Google and deletes it from our store).
+- Tokens: encrypt refresh tokens at rest (envelope encryption with a key from env/KMS),
+  never log them, never send them to the browser. Handle revoked/expired tokens by
+  marking the integration as "needs reconnect" and emailing the admin.
+- Follow Google's API Services User Data Policy; the privacy policy page must state
+  exactly what we read and why. Note in the README what Google OAuth verification
+  this app will need before launch.
+- Design the integrations table and sync code so Google Workspace directory sync,
+  Microsoft 365/Entra sync, contacts export and SCIM can be added later as new
+  providers without schema changes.
 
 ## MVP features
 1. Auth + onboarding: sign up, create org, set branding (logo upload, colours).
@@ -92,7 +118,9 @@ stripe ids, seats, status), audit_log (who changed what).
   audit log of admin changes. Store data in a Singapore region where possible.
 
 ## Out of scope for this MVP (do not build yet)
-Structured design editor (layout, fonts, backgrounds, section order), AI design
+Google Workspace directory sync, Microsoft 365/Entra sync, Google/Outlook contacts
+export, calendar booking, SCIM, Workspace Marketplace listing,
+structured design editor (layout, fonts, backgrounds, section order), AI design
 assistant, Apple Wallet, NFC hardware, event mode, CRM integrations, SSO/directory sync,
 custom customer domains, bilingual auto-switch.
 Later the AI design assistant will turn a text prompt or logo into a `CardDesign` JSON
@@ -104,7 +132,7 @@ design schema and renderer clean enough for that.
    schema + RLS policies, the CardDesign schema, and a milestone plan. Wait for my OK.
 2. Build in milestones, each ending with passing tests, a short demo checklist, and a commit:
    M1 auth/orgs/branding · M2 cards CRUD + public card page (Neon theme) ·
-   M3 themes + brand lock · M4 CSV import + QR export · M5 redirect-on-archive + leads ·
+   M3 themes + brand lock · M4 CSV + Google Sheets import (Picker) + QR export · M5 redirect-on-archive + leads ·
    M6 Google Wallet · M7 analytics · M8 Stripe billing.
 3. Keep a README with local setup, env vars, and deploy steps. Seed script with demo data.
 4. Verify Google Wallet and Stripe API details against their current official docs;
@@ -115,5 +143,6 @@ design schema and renderer clean enough for that.
 - Product name / domain: [e.g. pyrahash.app]
 - Google Wallet issuer ID + service account (via env vars, later)
 - Stripe test keys (via env vars, later)
+- Google Cloud OAuth client ID/secret + Picker API key (via env vars, later)
 - Pricing: Team plan = [RM __ per seat / month]
 ````
