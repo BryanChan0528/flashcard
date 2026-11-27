@@ -25,14 +25,15 @@ text #F0F4FF / #8892AA, fonts Inter + Space Grotesk.
 
 ## Goal
 Ship an MVP where a company signs up, adds its staff, and each staff member gets a
-branded digital card with QR code, contact saving, WhatsApp, and Google Wallet pass,
-billed per seat. Pitch: "Never lose a lead or a client when someone leaves."
+branded digital card with QR code, contact saving, WhatsApp, and Google Wallet pass.
+The MVP launches as an invite-only FREE BETA (3-6 months): no billing code yet, but
+everything needed to switch on per-seat billing later. Pitch: "Never lose a lead or a client when someone leaves."
 
 ## Stack (use these unless you have a strong reason; ask me first)
 - Next.js (App Router, TypeScript, Tailwind), deployed on Vercel
 - Supabase: Postgres, Auth (email magic link + Google sign-in), Storage for photos/logos
 - Row-level security on every tenant table, keyed by org_id
-- Stripe Billing: per-seat subscription, Stripe Checkout + Customer Portal, webhooks
+- Stripe Billing comes AFTER the beta (not in this MVP); keep the data model ready for it
 - Background work: Vercel Cron / queued jobs for Wallet sync and CSV imports
 - Zod for validation, Vitest for unit tests, Playwright for e2e
 
@@ -44,7 +45,8 @@ design_policy jsonb: allowed theme ids, locked theme id or null, allow personal 
 card_events (view | save_contact | qr_open | whatsapp_click | wallet_click),
 leads (card_id, name, phone, email, note, consent_at), wallet_passes
 (card_id, object_id, save_link, synced_at, last_error), subscriptions (org_id,
-stripe ids, seats, status), integrations (org_id, provider, connected_by,
+plan: beta | free | team, beta_ends_at, card_limit, seats_used, stripe ids nullable,
+status), beta_applications (company, contact, staff count, use case, status), integrations (org_id, provider, connected_by,
 connected account email, granted scopes, encrypted refresh token, status,
 last_synced_at, last_error), audit_log (who changed what).
 
@@ -105,8 +107,16 @@ last_synced_at, last_error), audit_log (who changed what).
    create on card creation, PATCH on edit, mark inactive on archive. Retries + error log.
 8. Analytics: per-card and per-org counts of views, contact saves, WhatsApp clicks,
    QR opens, last 30 days.
-9. Billing: Free (1 card), Team (per seat). Enforce seat limits; Stripe webhooks keep
-   subscriptions in sync; Customer Portal for invoices.
+9. Free beta controls:
+   - Invite-only sign-up: public "Apply for the beta" form (company, contact, staff count,
+     use case); a super-admin screen to approve or reject; approval emails an invite link.
+   - Every org starts on plan "beta" with a soft limit of 25 cards (configurable per org).
+     At the limit, show a friendly "contact us to raise your limit" message, never data loss.
+   - "Free during beta" badge in the dashboard; banner and email 30 days before beta_ends_at.
+   - Record seats used per org daily, so pricing and billing can be switched on later.
+   - Feedback: in-app "Would you pay for this? How much per person per month?" survey
+     shown once per org admin after 2 weeks of use; answers visible to super-admins.
+   - A super-admin dashboard: orgs, cards per org, activity (views, saves), survey answers.
 
 ## Security and compliance (must-haves)
 - RLS on every table; a test proving org A can never read org B's data.
@@ -122,7 +132,8 @@ Google Workspace directory sync, Microsoft 365/Entra sync, Google/Outlook contac
 export, calendar booking, SCIM, Workspace Marketplace listing,
 structured design editor (layout, fonts, backgrounds, section order), AI design
 assistant, Apple Wallet, NFC hardware, event mode, CRM integrations, SSO/directory sync,
-custom customer domains, bilingual auto-switch.
+custom customer domains, bilingual auto-switch, Stripe billing and paid plans
+(planned for right after the beta).
 Later the AI design assistant will turn a text prompt or logo into a `CardDesign` JSON
 (never HTML), validated by the same schema and checks, shown as a preview. Keep the
 design schema and renderer clean enough for that.
@@ -133,7 +144,8 @@ design schema and renderer clean enough for that.
 2. Build in milestones, each ending with passing tests, a short demo checklist, and a commit:
    M1 auth/orgs/branding · M2 cards CRUD + public card page (Neon theme) ·
    M3 themes + brand lock · M4 CSV + Google Sheets import (Picker) + QR export · M5 redirect-on-archive + leads ·
-   M6 Google Wallet · M7 analytics · M8 Stripe billing.
+   M6 Google Wallet · M7 analytics · M8 beta controls (applications,
+   limits, survey, super-admin dashboard).
 3. Keep a README with local setup, env vars, and deploy steps. Seed script with demo data.
 4. Verify Google Wallet and Stripe API details against their current official docs;
    note any assumption in the README instead of guessing field names.
@@ -142,7 +154,8 @@ design schema and renderer clean enough for that.
 ## Inputs I'll provide
 - Product name / domain: [e.g. pyrahash.app]
 - Google Wallet issuer ID + service account (via env vars, later)
-- Stripe test keys (via env vars, later)
+- Stripe test keys (only after the beta)
 - Google Cloud OAuth client ID/secret + Picker API key (via env vars, later)
-- Pricing: Team plan = [RM __ per seat / month]
+- Beta length: [e.g. 3 months] · card limit per company: [e.g. 25]
+- Pricing after beta: Team plan = [RM __ per seat / month] (can stay blank for now)
 ````
