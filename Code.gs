@@ -156,13 +156,13 @@ function setUpSheets() {
   }
 
   // Add any optional column that is missing (for example WhatsApp) at the end.
-  const header = emp.getRange(1, 1, 1, Math.max(emp.getLastColumn(), 1)).getValues()[0].map((h) => String(h).trim());
+  const header = emp.getRange(1, 1, 1, Math.max(emp.getLastColumn(), 1)).getValues()[0].map(headerKey_);
   OPTIONAL_HEADERS.forEach((h) => {
-    if (header.indexOf(h) !== -1) return;
+    if (header.indexOf(headerKey_(h)) !== -1) return;
     const col = emp.getLastColumn() + 1;
     emp.getRange(1, col).setValue(h).setFontWeight('bold');
     emp.getRange(2, col, emp.getMaxRows() - 1, 1).setNumberFormat('@');
-    header.push(h);
+    header.push(headerKey_(h));
   });
 
   getLogSheet_();
@@ -331,16 +331,22 @@ function getEmployeesSheet_() {
   if (!sheet) throw new Error('No "' + SHEET_EMPLOYEES + '" tab. Run Wallet > Set up sheet tabs.');
   const header = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1)).getValues()[0];
   const map = columnMap_(header);
-  const missing = HEADERS.filter((h) => map[h] === undefined);
+  const missing = HEADERS.filter((h) => map[headerKey_(h)] === undefined);
   if (missing.length) throw new Error('Employees tab is missing columns: ' + missing.join(', '));
   return { sheet: sheet, map: map };
 }
 
-/** Maps header text to a 0-based column index. */
+/** Header text compared without case or extra spaces:
+ *  "Whatsapp", "WHATSAPP " and "WhatsApp" are the same column. */
+function headerKey_(h) {
+  return String(h).replace(/\s+/g, ' ').trim().toLowerCase();
+}
+
+/** Maps each header (see headerKey_) to a 0-based column index. */
 function columnMap_(headerRow) {
   const map = {};
   headerRow.forEach((h, i) => {
-    const key = String(h).trim();
+    const key = headerKey_(h);
     if (key && map[key] === undefined) map[key] = i;
   });
   return map;
@@ -348,7 +354,7 @@ function columnMap_(headerRow) {
 
 /** Converts one sheet row into a plain employee object (trimmed strings). */
 function rowToEmployee_(row, map) {
-  const get = (h) => (map[h] === undefined ? '' : clean_(row[map[h]]));
+  const get = (h) => (map[headerKey_(h)] === undefined ? '' : clean_(row[map[headerKey_(h)]]));
   return {
     employeeId: get(COL.ID),
     slug: get(COL.SLUG),
@@ -372,7 +378,7 @@ function isBlankEmployee_(emp) {
 
 /** Writes a value to one cell by header name (row is 1-based). */
 function setCell_(sheet, map, rowNumber, header, value) {
-  sheet.getRange(rowNumber, map[header] + 1).setValue(value);
+  sheet.getRange(rowNumber, map[headerKey_(header)] + 1).setValue(value);
 }
 
 /** Returns the Logs sheet, creating it with headers if needed. */
@@ -540,7 +546,7 @@ function findDuplicateSlugs_(values, map) {
   const seen = {};
   const dupes = {};
   for (let i = 1; i < values.length; i++) {
-    const slug = parseSlug_(values[i][map[COL.SLUG]]);
+    const slug = parseSlug_(values[i][map[headerKey_(COL.SLUG)]]);
     if (!slug) continue;
     if (seen[slug]) dupes[slug] = true;
     seen[slug] = true;
@@ -819,14 +825,19 @@ function telHref_(phone) {
 /**
  * WhatsApp click-to-chat link (https://wa.me/<number>), or '' if none.
  * The WhatsApp column may hold a number, or "same" / "yes" to reuse Phone.
- * A local number starting with 0 gets DEFAULT_COUNTRY_CODE (60 = Malaysia):
- * 012-345 6789 -> 60123456789. withMessage adds a pre-filled greeting.
+ * A number without "+" is treated as local and gets DEFAULT_COUNTRY_CODE
+ * (60 = Malaysia): 012-345 6789 or 12-345 6789 -> 60123456789. withMessage adds a pre-filled greeting.
  */
 function whatsAppHref_(emp, cfg, withMessage) {
   const raw = whatsAppNumber_(emp);
   if (!raw) return '';
   let digits = raw.replace(/\D/g, '');
-  if (raw.charAt(0) !== '+' && digits.charAt(0) === '0') digits = cfg.countryCode + digits.slice(1);
+  if (raw.charAt(0) !== '+') {
+    // Local number: 012-345 6789, or 12-345 6789 when Sheets dropped the 0.
+    // Numbers from other countries must be typed with + and their code.
+    if (digits.charAt(0) === '0') digits = cfg.countryCode + digits.slice(1);
+    else if (digits.indexOf(cfg.countryCode) !== 0) digits = cfg.countryCode + digits;
+  }
   if (digits.length < 8 || digits.length > 15) return '';
   let url = 'https://wa.me/' + digits;
   if (withMessage) {
