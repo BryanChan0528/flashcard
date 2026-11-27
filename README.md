@@ -54,6 +54,7 @@ Google Wallet API: genericClass (once), then genericObject POST (insert) / PATCH
   - **Card Slug** may only contain `a-z`, `0-9` and single hyphens, for example `jane-doe`. Each slug must be unique.
   - **Photo URL** must be a public `https://` image URL. Google's servers fetch it for the pass.
 
+  - **WhatsApp** (optional column, added by **Set up sheet tabs**): a WhatsApp number such as `012-345 6789` or `+60 12-345 6789`, or `same` to use the Phone number. When filled, the card shows a **Chat on WhatsApp** button that opens a chat with a pre-filled greeting, and the Wallet pass gets a WhatsApp link. Leave it empty to hide WhatsApp.
 > Alternative: use `clasp push` from this folder. `.claspignore` limits the push to the three project files.
 
 ### 2. Google Cloud project and service account
@@ -88,6 +89,7 @@ In Apps Script, open **Project Settings › Script Properties › Add script pro
 | `CARD_COLOR` | Optional | `#1a73e8` | Hex colour. Defaults to `#1a73e8`. Text on it switches between black and white for contrast. |
 | `COMPANY_URL` | Optional | `https://pyrahash.com` | Target of the "Visit Pyrahash" button. |
 | `CLASS_SUFFIX` | Optional | `pyrahash_staff_card` | The pass class ID is `<ISSUER_ID>.<CLASS_SUFFIX>`. |
+| `DEFAULT_COUNTRY_CODE` | Optional | `60` | Country code added to WhatsApp numbers that start with 0 (60 = Malaysia). Defaults to `60`. |
 
 The card page reads only the non-secret properties. The service account key is read only by the Wallet menu actions.
 

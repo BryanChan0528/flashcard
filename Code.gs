@@ -34,11 +34,15 @@ const COL = {
   OBJECT_ID: 'Wallet Object ID',
   SAVE_LINK: 'Wallet Save Link',
   UPDATED: 'Last Updated',
+  WHATSAPP: 'WhatsApp',
 };
 const HEADERS = [
   COL.ID, COL.SLUG, COL.NAME, COL.TITLE, COL.DEPT, COL.PHONE, COL.EMAIL,
   COL.WEBSITE, COL.PHOTO, COL.OBJECT_ID, COL.SAVE_LINK, COL.UPDATED,
 ];
+/** Optional columns: used when present, never required. Add them to the
+ *  right of Last Updated (Wallet > Set up sheet tabs does this for you). */
+const OPTIONAL_HEADERS = [COL.WHATSAPP];
 const LOG_HEADERS = ['Timestamp', 'Action', 'Row', 'Employee ID', 'Status', 'Message'];
 
 /** Google Wallet / OAuth endpoints (from the Google Wallet REST reference). */
@@ -76,6 +80,7 @@ function getConfig_() {
     cardColor: normaliseHex_(p.CARD_COLOR) || '#1a73e8',
     baseUrl: normaliseBaseUrl_(p.BASE_URL),
     companyUrl: safeWebUrl_(p.COMPANY_URL) || 'https://pyrahash.com',
+    countryCode: /^\d{1,3}$/.test(clean_(p.DEFAULT_COUNTRY_CODE)) ? clean_(p.DEFAULT_COUNTRY_CODE) : '60',
     issuerId: clean_(p.ISSUER_ID),
     classSuffix: clean_(p.CLASS_SUFFIX) || DEFAULT_CLASS_SUFFIX,
   };
@@ -149,6 +154,16 @@ function setUpSheets() {
     // Keep phone numbers as text so leading "+" and "0" survive.
     emp.getRange(2, HEADERS.indexOf(COL.PHONE) + 1, emp.getMaxRows() - 1, 1).setNumberFormat('@');
   }
+
+  // Add any optional column that is missing (for example WhatsApp) at the end.
+  const header = emp.getRange(1, 1, 1, Math.max(emp.getLastColumn(), 1)).getValues()[0].map((h) => String(h).trim());
+  OPTIONAL_HEADERS.forEach((h) => {
+    if (header.indexOf(h) !== -1) return;
+    const col = emp.getLastColumn() + 1;
+    emp.getRange(1, col).setValue(h).setFontWeight('bold');
+    emp.getRange(2, col, emp.getMaxRows() - 1, 1).setNumberFormat('@');
+    header.push(h);
+  });
 
   getLogSheet_();
   SpreadsheetApp.getUi().alert('The Employees and Logs tabs are ready.');
@@ -250,6 +265,8 @@ function buildCardData_(emp, cfg) {
     d.emailHref = email ? 'mailto:' + email : '';
     d.website = website;
     d.websiteLabel = website.replace(/^https?:\/\//i, '').replace(/\/$/, '');
+    d.whatsappHref = whatsAppHref_(emp, cfg, true);
+    d.whatsapp = d.whatsappHref ? whatsAppNumber_(emp) : '';
     d.vcard = buildVCard_(emp, cfg.companyName);
     d.vcardFilename = emp.slug + '.vcf';
     d.vcardFallbackUrl = appUrl ? appUrl + '?card=' + encodeURIComponent(emp.slug) + '&format=vcf' : '';
@@ -342,6 +359,7 @@ function rowToEmployee_(row, map) {
     email: get(COL.EMAIL),
     website: get(COL.WEBSITE),
     photoUrl: get(COL.PHOTO),
+    whatsapp: get(COL.WHATSAPP),
     objectId: get(COL.OBJECT_ID),
     saveLink: get(COL.SAVE_LINK),
   };
@@ -600,6 +618,8 @@ function buildGenericObject_(cfg, emp, objectId) {
 
   if (phoneHref) obj.linksModuleData.uris.push({ id: 'call', uri: phoneHref, description: 'Call' });
   if (email) obj.linksModuleData.uris.push({ id: 'email', uri: 'mailto:' + email, description: 'Email' });
+  const wa = whatsAppHref_(emp, cfg, false);
+  if (wa) obj.linksModuleData.uris.push({ id: 'whatsapp', uri: wa, description: 'Chat on WhatsApp' });
   if (website) obj.linksModuleData.uris.push({ id: 'website', uri: website, description: 'Website' });
   obj.linksModuleData.uris.push({ id: 'card', uri: cardUrl, description: 'Digital name card' });
 
@@ -794,6 +814,34 @@ function telHref_(phone) {
   const digits = p.replace(/\D/g, '');
   if (digits.length < 3) return '';
   return 'tel:' + (p.charAt(0) === '+' ? '+' : '') + digits;
+}
+
+/**
+ * WhatsApp click-to-chat link (https://wa.me/<number>), or '' if none.
+ * The WhatsApp column may hold a number, or "same" / "yes" to reuse Phone.
+ * A local number starting with 0 gets DEFAULT_COUNTRY_CODE (60 = Malaysia):
+ * 012-345 6789 -> 60123456789. withMessage adds a pre-filled greeting.
+ */
+function whatsAppHref_(emp, cfg, withMessage) {
+  const raw = whatsAppNumber_(emp);
+  if (!raw) return '';
+  let digits = raw.replace(/\D/g, '');
+  if (raw.charAt(0) !== '+' && digits.charAt(0) === '0') digits = cfg.countryCode + digits.slice(1);
+  if (digits.length < 8 || digits.length > 15) return '';
+  let url = 'https://wa.me/' + digits;
+  if (withMessage) {
+    const first = clean_(emp.fullName).split(/\s+/)[0] || '';
+    const msg = 'Hi ' + first + ', I got your contact from your ' + cfg.companyName + ' name card.';
+    url += '?text=' + encodeURIComponent(msg);
+  }
+  return url;
+}
+
+/** The WhatsApp number as typed in the sheet (or Phone when set to "same"/"yes"). */
+function whatsAppNumber_(emp) {
+  const v = clean_(emp.whatsapp);
+  if (/^(same|yes|y)$/i.test(v)) return clean_(emp.phone);
+  return v;
 }
 
 function isEmail_(email) {
