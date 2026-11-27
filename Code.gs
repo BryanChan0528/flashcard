@@ -368,7 +368,7 @@ function rowToEmployee_(row, map) {
     email: get(COL.EMAIL),
     website: get(COL.WEBSITE),
     photoUrl: get(COL.PHOTO),
-    whatsapp: get(COL.WHATSAPP),
+    whatsapp: whatsAppCell_(row, map),
     objectId: get(COL.OBJECT_ID),
     saveLink: get(COL.SAVE_LINK),
   };
@@ -851,10 +851,23 @@ function whatsAppHref_(emp, cfg, withMessage) {
   return url;
 }
 
-/** The WhatsApp number as typed in the sheet (or Phone when set to "same"/"yes"). */
+/**
+ * The WhatsApp cell. Any header containing "whatsapp" counts, so
+ * "WhatsApp", "WhatsApp Number" and "Whatsapp No." all work.
+ */
+function whatsAppCell_(row, map) {
+  const key = Object.keys(map).find((k) => k.indexOf('whatsapp') !== -1);
+  return key === undefined ? '' : clean_(row[map[key]]);
+}
+
+/**
+ * The WhatsApp number to use. A cell with no digits at all ("same",
+ * "Same as phone", "yes", a tick) means "use the Phone number".
+ */
 function whatsAppNumber_(emp) {
   const v = clean_(emp.whatsapp);
-  if (/^(same|yes|y)$/i.test(v)) return clean_(emp.phone);
+  if (!v) return '';
+  if (!/\d/.test(v)) return clean_(emp.phone);
   return v;
 }
 

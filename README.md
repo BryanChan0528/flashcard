@@ -54,7 +54,7 @@ Google Wallet API: genericClass (once), then genericObject POST (insert) / PATCH
   - **Card Slug** may only contain `a-z`, `0-9` and single hyphens, for example `jane-doe`. Each slug must be unique.
   - **Photo URL** must be a public `https://` image URL. Google's servers fetch it for the pass.
 
-  - **WhatsApp** (optional column, added by **Set up sheet tabs**): a WhatsApp number such as `012-345 6789` or `+60 12-345 6789`, or `same` to use the Phone number. When filled, the card shows a **Chat on WhatsApp** button that opens a chat with a pre-filled greeting, and the Wallet pass gets a WhatsApp link. Leave it empty to hide WhatsApp.
+  - **WhatsApp** (optional column, added by **Set up sheet tabs**): a WhatsApp number such as `012-345 6789` or `+60 12-345 6789`, or `same` (any text without digits) to use the Phone number. Any header containing "WhatsApp" works, such as "WhatsApp Number". When filled, the card shows a **Chat on WhatsApp** button that opens a chat with a pre-filled greeting, and the Wallet pass gets a WhatsApp link. Leave it empty to hide WhatsApp.
 > Alternative: use `clasp push` from this folder. `.claspignore` limits the push to the three project files.
 
 ### 2. Google Cloud project and service account
