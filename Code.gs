@@ -304,11 +304,14 @@ function findEmployeeBySlug_(slug) {
 function buildVCard_(emp, companyName) {
   const esc = (s) => String(s || '')
     .replace(/\\/g, '\\\\').replace(/\r?\n/g, '\\n').replace(/,/g, '\\,').replace(/;/g, '\\;');
-  const name = splitName_(emp.fullName);
   const lines = [
     'BEGIN:VCARD',
     'VERSION:3.0',
-    'N:' + esc(name.family) + ';' + esc(name.given) + ';;;',
+    // Whole name as the given name, family name left empty: Malaysian names
+    // follow several orders (Chan Yung Her, Ahmad bin Ali, Ravi a/l Kumar),
+    // and phones would reorder a split name as "given family". This way every
+    // phone shows the name exactly as typed in the sheet.
+    'N:;' + esc(emp.fullName) + ';;;',
     'FN:' + esc(emp.fullName),
     'ORG:' + esc(companyName) + (emp.department ? ';' + esc(emp.department) : ''),
   ];
@@ -857,13 +860,6 @@ function whatsAppNumber_(emp) {
 
 function isEmail_(email) {
   return /^[^\s@<>"',;]+@[^\s@<>"',;]+\.[^\s@<>"',;]+$/.test(clean_(email));
-}
-
-/** Simple split: last word is the family name. */
-function splitName_(fullName) {
-  const parts = clean_(fullName).split(/\s+/);
-  if (parts.length < 2) return { given: parts[0] || '', family: '' };
-  return { given: parts.slice(0, -1).join(' '), family: parts[parts.length - 1] };
 }
 
 function initials_(fullName) {
